@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { 
   getAuth, 
   signInWithPopup, 
@@ -18,53 +18,56 @@ import {
 
 /**
  * --- KONPIGURASYON NG NEGOSYO ---
- * Ang email na ito ang tanging magkakaroon ng Admin Access.
+ * Siguraduhing ito ang iyong Gmail address.
  */
 const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 
-// --- Safe Config Loading (Inayos para sa Browser/Vercel/Canvas) ---
-const getEnvConfig = () => {
+// --- Build-Safe Environment Variable Loader ---
+const getSafeConfig = () => {
   try {
-    // Check global variables first (provided by Canvas/Environment)
-    const globalConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-    if (globalConfig) {
-      return typeof globalConfig === 'string' ? JSON.parse(globalConfig) : globalConfig;
-    }
+    // Check possible locations for the firebase config string
+    const configRaw = 
+      (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config)) ||
+      (typeof __firebase_config !== 'undefined' ? __firebase_config : null) ||
+      (typeof window !== 'undefined' && window.__firebase_config);
 
-    // Fallback for process.env with existence check (Standard for Vercel/CRA)
-    if (typeof process !== 'undefined' && process.env) {
-      const envConfig = process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config;
-      if (envConfig) {
-        return typeof envConfig === 'string' ? JSON.parse(envConfig) : envConfig;
-      }
-    }
+    if (!configRaw) return null;
     
-    return null;
-  } catch (e) {
-    console.error("Error parsing Firebase Config:", e);
+    // If it's already an object, return it. If it's a string, parse it.
+    if (typeof configRaw === 'object') return configRaw;
+    return JSON.parse(configRaw);
+  } catch (err) {
+    console.error("Firebase Config Parsing Failed:", err);
     return null;
   }
 };
 
-const getAppId = () => {
-  if (typeof __app_id !== 'undefined') return __app_id;
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env.REACT_APP_APP_ID || process.env.__app_id || 'swifftnet-remote-v3';
-  }
-  return 'swifftnet-remote-v3';
+const getSafeAppId = () => {
+  const id = 
+    (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_APP_ID || process.env.__app_id)) ||
+    (typeof __app_id !== 'undefined' ? __app_id : 'swifftnet-remote-v3');
+  return id;
 };
 
-const firebaseConfig = getEnvConfig();
-const appId = getAppId();
+const firebaseConfig = getSafeConfig();
+const appId = getSafeAppId();
 
-// Siguraduhing hindi magka-crash ang app kung wala pang config
-const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
-const auth = app ? getAuth(app) : null;
-const db = app ? getFirestore(app) : null;
+// Initialize Firebase only once and only if config is valid
+let app, auth, db;
+if (firebaseConfig && getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} else if (getApps().length > 0) {
+  app = getApps()[0];
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+
 const googleProvider = new GoogleAuthProvider();
 
-// --- UI Icons (Inline SVG para sa stability) ---
+// --- Inline SVG Icons ---
 const IconShield = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 const IconCheck = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconCard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
@@ -87,7 +90,10 @@ export default function App() {
 
   // --- Auth Observer ---
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      setIsAuthReady(true);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
         const role = fUser.email === ADMIN_EMAIL ? 'admin' : 'client';
@@ -116,18 +122,9 @@ export default function App() {
     const rCol = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
     const aCol = collection(db, 'artifacts', appId, 'public', 'data', 'assignments');
 
-    const unsubP = onSnapshot(pCol, 
-      (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (err) => console.error("Payments listener error:", err)
-    );
-    const unsubR = onSnapshot(rCol, 
-      (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (err) => console.error("Requests listener error:", err)
-    );
-    const unsubA = onSnapshot(aCol, 
-      (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (err) => console.error("Assignments listener error:", err)
-    );
+    const unsubP = onSnapshot(pCol, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubR = onSnapshot(rCol, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubA = onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => { unsubP(); unsubR(); unsubA(); };
   }, [user]);
@@ -155,9 +152,9 @@ export default function App() {
     } catch (err) {
       console.error("Login failed:", err);
       if (err.code === 'auth/unauthorized-domain') {
-        setAuthError("Ang domain na ito ay hindi authorized sa Firebase. Pumunta sa Firebase Console > Auth > Settings > Authorized Domains at i-add ang domain ng website mo.");
+        setAuthError("Domain not authorized. Please add your Vercel URL to Firebase Authorized Domains.");
       } else {
-        setAuthError(`Login Error: ${err.message}`);
+        setAuthError(`Error: ${err.message}`);
       }
     }
   };
@@ -214,38 +211,37 @@ export default function App() {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
   };
 
-  // --- Views ---
+  // --- Render ---
 
   if (!firebaseConfig) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-red-500/10 border border-red-500/30 p-8 rounded-[40px] max-w-md">
-          <div className="text-red-500 mb-4 flex justify-center"><IconAlert /></div>
-          <h2 className="text-xl font-black text-white mb-2 uppercase tracking-widest">Config Error</h2>
-          <p className="text-slate-400 text-sm leading-relaxed">Hindi mahanap ang Firebase Configuration. Siguraduhing na-set mo ang <strong>__firebase_config</strong> sa iyong Environment Variables.</p>
+        <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
+          <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Database Error</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6">Hindi mahanap ang Firebase Configuration. Siguraduhing na-set mo ang <strong>__firebase_config</strong> sa Environment Variables ng Vercel.</p>
+          <div className="text-[10px] text-slate-600 bg-black/40 p-4 rounded-xl font-mono text-left">
+            Vercel Dashboard {' > '} Settings {' > '} Environment Variables {' > '} Key: __firebase_config
+          </div>
         </div>
       </div>
     );
   }
 
   if (!isAuthReady) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest">
-        Inihahanda ang SwifftNet System...
-      </div>
-    );
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest">Initialising Cloud Core...</div>;
   }
 
   if (view === 'landing') {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in duration-500">
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <h1 className="text-5xl font-black mb-4 tracking-tighter uppercase italic text-white leading-tight">SwifftNet <span className="text-blue-600">Remote</span></h1>
-        <p className="text-slate-500 max-w-sm mb-12 text-lg">Secure Enterprise Cloud Tunnels para sa MikroTik, OLT, at SSH Access.</p>
+        <p className="text-slate-500 max-w-sm mb-12 text-lg font-medium leading-relaxed">Enterprise Cloud Tunnels for MikroTik, OLT, and API Management.</p>
         
         <div className="w-full max-w-md space-y-6">
           {authError && (
-            <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-sm flex gap-4 animate-in fade-in zoom-in-95">
+            <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-xs flex gap-4 animate-in fade-in zoom-in-95">
               <div className="flex-shrink-0"><IconAlert /></div>
               <p className="text-left font-medium leading-relaxed">{authError}</p>
             </div>
@@ -253,7 +249,7 @@ export default function App() {
           
           <button 
             onClick={handleGoogleLogin} 
-            className="w-full bg-white text-slate-900 px-10 py-5 rounded-[2rem] font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest"
+            className="w-full bg-white text-slate-900 px-10 py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest"
           >
             <IconGoogle /> Sign in with Google
           </button>
@@ -266,19 +262,19 @@ export default function App() {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
     const myPays = payments.filter(p => p.email === user.email);
-    const scriptBase = `/ip firewall filter add action=accept chain=input comment="SWIFFTNET_ACCESS" src-address=192.168.89.0/24 
-/ip firewall filter add action=accept chain=forward comment="SWIFFTNET_FORWARD" src-address=192.168.89.0/24
+    const scriptBase = `/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 
+/ip firewall filter add action=accept chain=forward src-address=192.168.89.0/24
 /ip service set api,api-ssl,ftp,ssh,telnet address=192.168.89.0/24`;
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
-        <div className="max-w-6xl mx-auto space-y-12">
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
               {user.photo && <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" />}
               <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">Verified Customer Portal</p>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2 font-mono">{user.email}</p>
               </div>
             </div>
             <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest px-10 py-3 rounded-2xl transition-all">Sign Out</button>
@@ -286,26 +282,26 @@ export default function App() {
 
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
-              <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-2">Iyong Balance</p>
+              <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-2">Available Balance</p>
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] md:col-span-2 flex flex-col md:flex-row items-center justify-between px-12 gap-6">
                <div className="text-center md:text-left">
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Aktibong Tunnels</p>
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Active Tunnels</p>
                   <p className="text-4xl font-black">{myReqs.filter(r => r.status === 'active').length}</p>
                </div>
                {bal >= VPN_PRICE ? (
                  <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-10 py-5 rounded-3xl font-black text-xs flex items-center gap-4 shadow-2xl shadow-blue-600/40 transition-all uppercase tracking-widest">
-                    <IconPlus /> Request New VPN (₱{VPN_PRICE})
+                    <IconPlus /> Add Instance (₱{VPN_PRICE})
                  </button>
-               ) : <span className="text-slate-700 text-[10px] font-black uppercase italic tracking-widest text-center">Kulang ang iyong balance para sa bagong tunnel</span>}
+               ) : <span className="text-slate-700 text-[10px] font-black uppercase italic tracking-widest text-center">Top up required for new tunnel</span>}
             </div>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none"><IconShield /> My Remote Nodes</h2>
-              
+              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">No nodes deployed.</div>}
               {myReqs.filter(r => r.type === 'new').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const isPendingRenewal = myReqs.some(r => r.type === 'renewal' && r.vpnId === req.id && r.status === 'pending');
@@ -317,9 +313,8 @@ export default function App() {
                         {req.status}
                       </span>
                     </div>
-                    
                     <div className="p-12 space-y-12">
-                      {req.status === 'pending' && <div className="text-center py-10 italic text-slate-600 font-bold uppercase tracking-widest animate-pulse">Wait: Admin is provisioning your credentials...</div>}
+                      {req.status === 'pending' && <div className="text-center py-10 italic text-slate-600 font-bold uppercase tracking-widest animate-pulse">Wait: Provisioning your node...</div>}
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-12">
                            {req.status === 'assigned' && (
@@ -327,43 +322,42 @@ export default function App() {
                            )}
                            <div className="space-y-10">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none">STEP 1: Winbox L2TP Dial-out Data</h4>
-                                <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3">
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic">01. Winbox L2TP Config</h4>
+                                <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
-                                   <div className="flex justify-between pt-1"><span className="text-slate-600 uppercase text-[9px] font-black">Keepalive</span> <span className="text-white font-black">10</span></div>
                                 </div>
                               </div>
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none">STEP 2: Security & Firewall Script</h4>
-                                <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto italic leading-loose">
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic">02. Terminal Payload</h4>
+                                <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto leading-loose italic">
                                   <pre className="whitespace-pre-wrap">{scriptBase}</pre>
                                 </div>
                               </div>
                            </div>
                            {req.status === 'active' && (
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center">
+                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
                                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">Winbox</p>
                                  <p className="text-xs font-black text-blue-400 font-mono break-all">{asgn.winbox}</p>
                                </div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center">
+                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
                                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">API Port</p>
                                  <p className="text-xs font-black text-indigo-400 font-mono break-all">{asgn.api}</p>
                                </div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">SSH Port</p>
+                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">SSH Access</p>
                                  <p className="text-xs font-black text-emerald-400 font-mono break-all">{asgn.ssh}</p>
                                </div>
                                <div className="col-span-full flex flex-col md:flex-row justify-between items-center bg-slate-950/50 p-10 rounded-[40px] border border-slate-800 gap-8 mt-6">
                                  <div>
-                                   <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest block mb-1">Valid Until</span>
+                                   <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest block mb-1 italic">Renewal Due</span>
                                    <span className="text-2xl font-black text-white">{asgn.expiry}</span>
                                  </div>
                                  {!isPendingRenewal && bal >= VPN_PRICE && (
-                                   <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-5 rounded-[2rem] font-black text-xs flex items-center gap-4 shadow-2xl transition-all uppercase tracking-widest">
-                                     <IconRefresh /> Renew VPN
+                                   <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-5 rounded-full font-black text-xs flex items-center gap-4 shadow-2xl transition-all uppercase tracking-widest">
+                                     <IconRefresh /> Extend access
                                    </button>
                                  )}
                                </div>
@@ -385,18 +379,18 @@ export default function App() {
                   submitDeposit(e.target.amount.value, e.target.ref.value); 
                   e.target.reset(); 
                 }} className="space-y-8">
-                  <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center mb-6">
-                      <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Receiver GCash</p>
-                      <p className="text-4xl font-black text-blue-500 tracking-tighter leading-none">0968 385 9759</p>
+                  <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center mb-6 border-dashed">
+                      <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">GCash Receiver</p>
+                      <p className="text-3xl font-black text-blue-500 tracking-tighter leading-none font-mono">0968 385 9759</p>
                   </div>
                   <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight" />
                   <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight uppercase" />
-                  <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm shadow-2xl transition-all uppercase tracking-widest">Submit Deposit</button>
+                  <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm shadow-2xl transition-all uppercase tracking-widest">Confirm Transaction</button>
                 </form>
 
                 <div className="space-y-6">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Deposit History</p>
-                  <div className="max-h-80 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Deposit Logs</p>
+                  <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar">
                     {myPays.map(p => (
                       <div key={p.id} className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 flex justify-between items-center text-[10px]">
                         <div><span className="text-slate-500 font-black block mb-1">REF: {p.refNo}</span><span className="text-slate-400 font-black">₱{p.amount} <span className="mx-1 opacity-20">|</span> {p.date}</span></div>
@@ -420,15 +414,15 @@ export default function App() {
     const clients = getAllClients();
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
-        <div className="max-w-7xl mx-auto space-y-16">
+        <div className="max-w-7xl mx-auto space-y-16 animate-in fade-in duration-700">
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Control <span className="text-blue-500">Center</span></h1>
+            <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Admin <span className="text-blue-500">Terminal</span></h1>
             <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-hidden">
               {['payments', 'requests', 'clients'].map(tab => (
                 <button key={tab} onClick={() => setAdminTab(tab)} className={`px-12 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
             </div>
-            <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full">Logout</button>
+            <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full">Sign Out</button>
           </header>
 
           <div className="animate-in fade-in duration-700">
@@ -447,7 +441,7 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-                {payments.filter(p => p.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest">Inbox Zero</p>}
+                {payments.filter(p => p.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50">Inbox Zero</p>}
               </div>
             )}
 
@@ -478,11 +472,11 @@ export default function App() {
                           <input name="ap" placeholder="API Port" required className="bg-slate-950 p-6 rounded-[2rem] text-sm font-black outline-none border border-slate-800 focus:border-blue-500 w-full" />
                         </div>
                       )}
-                      <button className="w-full bg-blue-600 hover:bg-blue-500 py-7 rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all">Authorize Tunnel</button>
+                      <button className="w-full bg-blue-600 hover:bg-blue-500 py-7 rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all">Authorize Node</button>
                     </form>
                   </div>
                 ))}
-                {requests.filter(r => r.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest">No pending deployments</p>}
+                {requests.filter(r => r.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50">No pending deployments</p>}
               </div>
             )}
 
@@ -500,13 +494,13 @@ export default function App() {
                     <tbody className="divide-y divide-slate-800">
                       {clients.map(email => (
                         <tr key={email} className="hover:bg-slate-800/20 transition-all group">
-                          <td className="p-12 font-black text-white italic">{email}</td>
+                          <td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td>
                           <td className="p-12 text-center font-black text-emerald-500 tracking-tighter text-2xl">₱{getUserBalance(email)}</td>
                           <td className="p-12">
                             <div className="space-y-4">
                               {assignments.filter(a => a.clientEmail === email).map((t, i) => (
                                 <div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner">
-                                   <span className="text-blue-500 font-mono text-[11px] font-black uppercase tracking-widest">WINBOX: {t.winbox}</span>
+                                   <span className="text-blue-500 font-mono text-[11px] font-black uppercase tracking-widest">W: {t.winbox}</span>
                                    <span className="text-slate-600 font-mono text-[11px] font-black uppercase tracking-widest italic">EXP: {t.expiry}</span>
                                 </div>
                               ))}
