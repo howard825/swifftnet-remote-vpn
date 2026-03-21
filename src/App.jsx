@@ -23,16 +23,18 @@ const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 
 // --- Build-Safe Environment Variable Loader ---
+// Ang function na ito ay naghahanap sa process.env at window object para sa config
 const getSafeConfig = () => {
   try {
-    // Tinitingnan ang REACT_APP_ prefix na kailangan ng Vercel/React builds
+    // Standard React variable lookup
     const configRaw = 
       (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config)) ||
-      (typeof window !== 'undefined' && (window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config));
+      (typeof window !== 'undefined' && (window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config || window.process?.env?.REACT_APP_FIREBASE_CONFIG));
 
     if (!configRaw) return null;
     
-    if (typeof configRaw === 'object') return configRaw;
+    // Siguraduhin na ang kinalabasan ay isang object
+    if (typeof configRaw === 'object' && configRaw !== null) return configRaw;
     return JSON.parse(configRaw);
   } catch (err) {
     console.error("Firebase Config Parsing Failed:", err);
@@ -43,7 +45,7 @@ const getSafeConfig = () => {
 const getSafeAppId = () => {
   const id = 
     (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_APP_ID || process.env.__app_id)) ||
-    (typeof window !== 'undefined' && (window.REACT_APP_APP_ID || window.__app_id)) ||
+    (typeof window !== 'undefined' && (window.REACT_APP_APP_ID || window.__app_id || window.process?.env?.REACT_APP_APP_ID)) ||
     'swifftnet-remote-v3';
   return id;
 };
@@ -216,17 +218,14 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
           <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
-          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Config Error</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-6 italic">Database settings not detected.</p>
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Database Error</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6 italic">Hindi mahanap ang iyong setup.</p>
           <div className="text-[11px] text-slate-300 bg-black/40 p-6 rounded-2xl font-mono text-left space-y-4 border border-slate-800">
-            <p className="text-blue-400 font-bold">HAKBANG PARA SA FIX:</p>
-            <p>1. Pumunta sa Vercel Dashboard { ' > ' } Settings { ' > ' } Environment Variables.</p>
-            <p>2. Palitan ang pangalan ng iyong Variables:</p>
-            <ul className="list-disc ml-4 space-y-1">
-              <li>Mula <code className="text-white">__firebase_config</code> gawing <code className="text-emerald-400 font-bold">REACT_APP_FIREBASE_CONFIG</code></li>
-              <li>Mula <code className="text-white">__app_id</code> gawing <code className="text-emerald-400 font-bold">REACT_APP_APP_ID</code></li>
-            </ul>
-            <p className="text-orange-400 text-[10px]">3. Pagkatapos i-save, i-redeploy ang project sa Vercel.</p>
+            <p className="text-blue-400 font-bold">HULING HAKBANG PARA GUMANA:</p>
+            <p>1. Dahil nagbago ka ng Environment Variables, kailangan mong i-rebuild ang site.</p>
+            <p>2. Pumunta sa Vercel { ' > ' } Deployments.</p>
+            <p>3. I-click ang tatlong tuldok (three dots) sa huling deployment at piliin ang <strong className="text-white uppercase font-black">REDEPLOY</strong>.</p>
+            <p className="text-orange-400 text-[10px]">Tandaan: Sa Redeploy window, i-click ang button na "Redeploy" para ma-refresh ang files.</p>
           </div>
         </div>
       </div>
@@ -234,7 +233,7 @@ export default function App() {
   }
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Loading Cloud Assets...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Loading Assets...</div>;
   }
 
   if (view === 'landing') {
@@ -246,7 +245,7 @@ export default function App() {
         
         <div className="w-full max-w-md space-y-6">
           {authError && (
-            <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-xs flex gap-4 animate-in fade-in zoom-in-95">
+            <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-sm flex gap-4 animate-in fade-in zoom-in-95">
               <div className="flex-shrink-0"><IconAlert /></div>
               <p className="text-left font-medium leading-relaxed">{authError}</p>
             </div>
