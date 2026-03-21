@@ -18,25 +18,27 @@ import {
 
 /**
  * --- KONPIGURASYON NG NEGOSYO ---
- * Siguraduhing ito ang iyong Gmail address.
  */
 const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 
 // --- Build-Safe Environment Variable Loader ---
+// Iniiwasan natin ang direktang pagtawag sa global variables para hindi mag-error sa ESLint (Vercel)
 const getSafeConfig = () => {
   try {
-    // Check possible locations for the firebase config string
-    const configRaw = 
-      (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config)) ||
-      (typeof __firebase_config !== 'undefined' ? __firebase_config : null) ||
-      (typeof window !== 'undefined' && window.__firebase_config);
+    // 1. Tinitingnan muna kung nandoon sa process.env (Standard para sa Vercel build)
+    if (typeof process !== 'undefined' && process.env) {
+      const envVal = process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config;
+      if (envVal) return typeof envVal === 'string' ? JSON.parse(envVal) : envVal;
+    }
 
-    if (!configRaw) return null;
+    // 2. Fallback sa window object para sa browser-injected variables
+    if (typeof window !== 'undefined' && window.__firebase_config) {
+      const winVal = window.__firebase_config;
+      return typeof winVal === 'string' ? JSON.parse(winVal) : winVal;
+    }
     
-    // If it's already an object, return it. If it's a string, parse it.
-    if (typeof configRaw === 'object') return configRaw;
-    return JSON.parse(configRaw);
+    return null;
   } catch (err) {
     console.error("Firebase Config Parsing Failed:", err);
     return null;
@@ -44,10 +46,14 @@ const getSafeConfig = () => {
 };
 
 const getSafeAppId = () => {
-  const id = 
-    (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_APP_ID || process.env.__app_id)) ||
-    (typeof __app_id !== 'undefined' ? __app_id : 'swifftnet-remote-v3');
-  return id;
+  if (typeof process !== 'undefined' && process.env) {
+    const envAppId = process.env.REACT_APP_APP_ID || process.env.__app_id;
+    if (envAppId) return envAppId;
+  }
+  if (typeof window !== 'undefined' && window.__app_id) {
+    return window.__app_id;
+  }
+  return 'swifftnet-remote-v3';
 };
 
 const firebaseConfig = getSafeConfig();
@@ -55,12 +61,12 @@ const appId = getSafeAppId();
 
 // Initialize Firebase only once and only if config is valid
 let app, auth, db;
-if (firebaseConfig && getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} else if (getApps().length > 0) {
-  app = getApps()[0];
+if (firebaseConfig) {
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApps()[0];
+  }
   auth = getAuth(app);
   db = getFirestore(app);
 }
@@ -152,7 +158,7 @@ export default function App() {
     } catch (err) {
       console.error("Login failed:", err);
       if (err.code === 'auth/unauthorized-domain') {
-        setAuthError("Domain not authorized. Please add your Vercel URL to Firebase Authorized Domains.");
+        setAuthError("Domain not authorized. Please add your website URL to Firebase Authorized Domains.");
       } else {
         setAuthError(`Error: ${err.message}`);
       }
@@ -218,8 +224,8 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
           <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
-          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Database Error</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-6">Hindi mahanap ang Firebase Configuration. Siguraduhing na-set mo ang <strong>__firebase_config</strong> sa Environment Variables ng Vercel.</p>
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Config missing</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6">Database configuration not found. Please ensure <strong>__firebase_config</strong> is set in Vercel Environment Variables.</p>
           <div className="text-[10px] text-slate-600 bg-black/40 p-4 rounded-xl font-mono text-left">
             Vercel Dashboard {' > '} Settings {' > '} Environment Variables {' > '} Key: __firebase_config
           </div>
@@ -229,7 +235,7 @@ export default function App() {
   }
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest">Initialising Cloud Core...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest">Initialising Core...</div>;
   }
 
   if (view === 'landing') {
@@ -390,7 +396,7 @@ export default function App() {
 
                 <div className="space-y-6">
                   <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Deposit Logs</p>
-                  <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar">
+                  <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar pr-2">
                     {myPays.map(p => (
                       <div key={p.id} className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 flex justify-between items-center text-[10px]">
                         <div><span className="text-slate-500 font-black block mb-1">REF: {p.refNo}</span><span className="text-slate-400 font-black">₱{p.amount} <span className="mx-1 opacity-20">|</span> {p.date}</span></div>
@@ -486,9 +492,9 @@ export default function App() {
                   <table className="w-full text-left">
                     <thead className="bg-slate-800/80 text-[11px] uppercase font-black text-slate-700 tracking-widest">
                       <tr>
-                        <th className="p-12">Client Entry</th>
+                        <th className="p-12">Identity</th>
                         <th className="p-12 text-center">Net Balance</th>
-                        <th className="p-12">Node Instances</th>
+                        <th className="p-12">Nodes</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
