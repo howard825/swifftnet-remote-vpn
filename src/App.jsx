@@ -23,22 +23,17 @@ const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 
 // --- Build-Safe Environment Variable Loader ---
-// Iniiwasan natin ang direktang pagtawag sa global variables para hindi mag-error sa ESLint (Vercel)
 const getSafeConfig = () => {
   try {
-    // 1. Tinitingnan muna kung nandoon sa process.env (Standard para sa Vercel build)
-    if (typeof process !== 'undefined' && process.env) {
-      const envVal = process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config;
-      if (envVal) return typeof envVal === 'string' ? JSON.parse(envVal) : envVal;
-    }
+    // Tinitingnan ang REACT_APP_ prefix na kailangan ng Vercel/React builds
+    const configRaw = 
+      (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config)) ||
+      (typeof window !== 'undefined' && (window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config));
 
-    // 2. Fallback sa window object para sa browser-injected variables
-    if (typeof window !== 'undefined' && window.__firebase_config) {
-      const winVal = window.__firebase_config;
-      return typeof winVal === 'string' ? JSON.parse(winVal) : winVal;
-    }
+    if (!configRaw) return null;
     
-    return null;
+    if (typeof configRaw === 'object') return configRaw;
+    return JSON.parse(configRaw);
   } catch (err) {
     console.error("Firebase Config Parsing Failed:", err);
     return null;
@@ -46,20 +41,17 @@ const getSafeConfig = () => {
 };
 
 const getSafeAppId = () => {
-  if (typeof process !== 'undefined' && process.env) {
-    const envAppId = process.env.REACT_APP_APP_ID || process.env.__app_id;
-    if (envAppId) return envAppId;
-  }
-  if (typeof window !== 'undefined' && window.__app_id) {
-    return window.__app_id;
-  }
-  return 'swifftnet-remote-v3';
+  const id = 
+    (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_APP_ID || process.env.__app_id)) ||
+    (typeof window !== 'undefined' && (window.REACT_APP_APP_ID || window.__app_id)) ||
+    'swifftnet-remote-v3';
+  return id;
 };
 
 const firebaseConfig = getSafeConfig();
 const appId = getSafeAppId();
 
-// Initialize Firebase only once and only if config is valid
+// Initialize Firebase safely
 let app, auth, db;
 if (firebaseConfig) {
   if (getApps().length === 0) {
@@ -224,10 +216,17 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
           <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
-          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Config missing</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-6">Database configuration not found. Please ensure <strong>__firebase_config</strong> is set in Vercel Environment Variables.</p>
-          <div className="text-[10px] text-slate-600 bg-black/40 p-4 rounded-xl font-mono text-left">
-            Vercel Dashboard {' > '} Settings {' > '} Environment Variables {' > '} Key: __firebase_config
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Config Error</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6 italic">Database settings not detected.</p>
+          <div className="text-[11px] text-slate-300 bg-black/40 p-6 rounded-2xl font-mono text-left space-y-4 border border-slate-800">
+            <p className="text-blue-400 font-bold">HAKBANG PARA SA FIX:</p>
+            <p>1. Pumunta sa Vercel Dashboard { ' > ' } Settings { ' > ' } Environment Variables.</p>
+            <p>2. Palitan ang pangalan ng iyong Variables:</p>
+            <ul className="list-disc ml-4 space-y-1">
+              <li>Mula <code className="text-white">__firebase_config</code> gawing <code className="text-emerald-400 font-bold">REACT_APP_FIREBASE_CONFIG</code></li>
+              <li>Mula <code className="text-white">__app_id</code> gawing <code className="text-emerald-400 font-bold">REACT_APP_APP_ID</code></li>
+            </ul>
+            <p className="text-orange-400 text-[10px]">3. Pagkatapos i-save, i-redeploy ang project sa Vercel.</p>
           </div>
         </div>
       </div>
@@ -235,7 +234,7 @@ export default function App() {
   }
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest">Initialising Core...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Loading Cloud Assets...</div>;
   }
 
   if (view === 'landing') {
@@ -328,7 +327,7 @@ export default function App() {
                            )}
                            <div className="space-y-10">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic">01. Winbox L2TP Config</h4>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">01. WINBOX L2TP DATA</h4>
                                 <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
@@ -336,7 +335,7 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic">02. Terminal Payload</h4>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">02. TERMINAL PAYLOAD</h4>
                                 <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto leading-loose italic">
                                   <pre className="whitespace-pre-wrap">{scriptBase}</pre>
                                 </div>
@@ -345,15 +344,15 @@ export default function App() {
                            {req.status === 'active' && (
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">Winbox</p>
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">Winbox</p>
                                  <p className="text-xs font-black text-blue-400 font-mono break-all">{asgn.winbox}</p>
                                </div>
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">API Port</p>
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">API Port</p>
                                  <p className="text-xs font-black text-indigo-400 font-mono break-all">{asgn.api}</p>
                                </div>
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none">SSH Access</p>
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">SSH Access</p>
                                  <p className="text-xs font-black text-emerald-400 font-mono break-all">{asgn.ssh}</p>
                                </div>
                                <div className="col-span-full flex flex-col md:flex-row justify-between items-center bg-slate-950/50 p-10 rounded-[40px] border border-slate-800 gap-8 mt-6">
@@ -386,20 +385,20 @@ export default function App() {
                   e.target.reset(); 
                 }} className="space-y-8">
                   <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center mb-6 border-dashed">
-                      <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">GCash Receiver</p>
+                      <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest font-mono italic">RECEIVER GCASH</p>
                       <p className="text-3xl font-black text-blue-500 tracking-tighter leading-none font-mono">0968 385 9759</p>
                   </div>
                   <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight" />
-                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight uppercase" />
+                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight uppercase font-mono" />
                   <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm shadow-2xl transition-all uppercase tracking-widest">Confirm Transaction</button>
                 </form>
 
                 <div className="space-y-6">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Deposit Logs</p>
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest font-mono">DEPOSIT LOGS</p>
                   <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar pr-2">
                     {myPays.map(p => (
                       <div key={p.id} className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 flex justify-between items-center text-[10px]">
-                        <div><span className="text-slate-500 font-black block mb-1">REF: {p.refNo}</span><span className="text-slate-400 font-black">₱{p.amount} <span className="mx-1 opacity-20">|</span> {p.date}</span></div>
+                        <div><span className="text-slate-500 font-black block mb-1 font-mono uppercase tracking-tighter">REF: {p.refNo}</span><span className="text-slate-400 font-black">₱{p.amount} <span className="mx-1 opacity-20">|</span> {p.date}</span></div>
                         <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>
                           {p.status}
                         </span>
@@ -447,7 +446,7 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-                {payments.filter(p => p.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50">Inbox Zero</p>}
+                {payments.filter(p => p.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50 font-mono italic">INBOX ZERO REACHED</p>}
               </div>
             )}
 
@@ -478,11 +477,11 @@ export default function App() {
                           <input name="ap" placeholder="API Port" required className="bg-slate-950 p-6 rounded-[2rem] text-sm font-black outline-none border border-slate-800 focus:border-blue-500 w-full" />
                         </div>
                       )}
-                      <button className="w-full bg-blue-600 hover:bg-blue-500 py-7 rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all">Authorize Node</button>
+                      <button className="w-full bg-blue-600 hover:bg-blue-500 py-7 rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all">Authorize Instance</button>
                     </form>
                   </div>
                 ))}
-                {requests.filter(r => r.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50">No pending deployments</p>}
+                {requests.filter(r => r.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50 font-mono italic">NO PENDING DEPLOYMENTS</p>}
               </div>
             )}
 
