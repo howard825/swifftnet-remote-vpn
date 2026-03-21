@@ -435,7 +435,7 @@ export default function App() {
     );
   }
 
-  // --- Admin Interface ---
+  // --- Admin Interface -
   if (view === 'admin' && user) {
     const clients = getAllClients();
     return (
