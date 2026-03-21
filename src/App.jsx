@@ -21,65 +21,28 @@ import {
  */
 const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
+const appId = "swifftnet-remote-v3"; // Identity folder sa Firestore
 
-// --- Build-Safe Environment Variable Loader ---
-const getSafeConfig = () => {
-  try {
-    // Check sa local storage kung may manual config
-    const manualConfig = typeof window !== 'undefined' ? localStorage.getItem('swifftnet_manual_config') : null;
-    if (manualConfig) return JSON.parse(manualConfig);
-
-    let configRaw = null;
-
-    // Standard React variable lookup (Kailangan ng REACT_APP_ prefix)
-    if (typeof process !== 'undefined' && process.env) {
-      configRaw = process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config;
-    }
-
-    // Fallback sa window object
-    if (!configRaw && typeof window !== 'undefined') {
-      configRaw = window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config || window.process?.env?.REACT_APP_FIREBASE_CONFIG;
-    }
-
-    if (!configRaw) return null;
-    if (typeof configRaw === 'object' && configRaw !== null) return configRaw;
-    
-    return JSON.parse(configRaw);
-  } catch (err) {
-    console.error("Firebase Config Parsing Failed:", err);
-    return null;
-  }
+// Hardcoded Firebase configuration para maiwasan ang Vercel variable issues
+const firebaseConfig = {
+  apiKey: "AIzaSyD7KSnje8RL_y6p2YVJB1C449Sudvhv6Ek",
+  authDomain: "swifftnet-remote.firebaseapp.com",
+  projectId: "swifftnet-remote",
+  storageBucket: "swifftnet-remote.firebasestorage.app",
+  messagingSenderId: "75832411435",
+  appId: "1:75832411435:web:6b718c4d9b89db533d316e",
+  measurementId: "G-EQ7VZ079W9"
 };
-
-const getSafeAppId = () => {
-  let id = 'swifftnet-remote-v3';
-  if (typeof process !== 'undefined' && process.env) {
-    id = process.env.REACT_APP_APP_ID || process.env.__app_id || id;
-  }
-  if (id === 'swifftnet-remote-v3' && typeof window !== 'undefined') {
-    id = window.REACT_APP_APP_ID || window.__app_id || id;
-  }
-  return id;
-};
-
-const firebaseConfig = getSafeConfig();
-const appId = getSafeAppId();
 
 // Initialize Firebase safely
 let app, auth, db;
-if (firebaseConfig) {
-  try {
-    if (getApps().length === 0) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApps()[0];
-    }
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.error("Firebase Init Error:", e);
-  }
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApps()[0];
 }
+auth = getAuth(app);
+db = getFirestore(app);
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -104,10 +67,6 @@ export default function App() {
 
   // --- Auth Observer ---
   useEffect(() => {
-    if (!auth) {
-      setIsAuthReady(true);
-      return;
-    }
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
         const role = fUser.email === ADMIN_EMAIL ? 'admin' : 'client';
@@ -159,7 +118,6 @@ export default function App() {
 
   // --- Actions ---
   const handleGoogleLogin = async () => {
-    if (!auth) return;
     setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
@@ -173,22 +131,19 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => auth && signOut(auth);
+  const handleLogout = () => signOut(auth);
 
   const submitDeposit = async (amount, refNo) => {
-    if (!db) return;
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
       email: user.email, amount, refNo, status: 'pending', date: new Date().toLocaleDateString()
     });
   };
 
   const updatePaymentStatus = async (id, status) => {
-    if (!db) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'payments', id), { status });
   };
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
-    if (!db) return;
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE) {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
@@ -198,7 +153,6 @@ export default function App() {
   };
 
   const adminAssignTunnel = async (reqId, email, data, type) => {
-    if (!db) return;
     if (type === 'renewal') {
       const target = assignments.find(a => a.requestId === data.vpnId);
       if (target) {
@@ -221,50 +175,10 @@ export default function App() {
   };
 
   const finalizeVpnStatus = async (reqId) => {
-    if (!db) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
   };
 
-  // --- Manual Setup ---
-  const handleManualSetup = (e) => {
-    e.preventDefault();
-    const config = e.target.config.value;
-    try {
-      JSON.parse(config);
-      localStorage.setItem('swifftnet_manual_config', config);
-      window.location.reload();
-    } catch (err) {
-      alert("Mali ang format ng JSON. Siguraduhing kinopya mo ang buong object { ... }");
-    }
-  };
-
   // --- Render ---
-
-  if (!firebaseConfig) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
-          <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
-          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none font-sans">Deployment Isyu</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-8 italic">Hindi pa nakakarga ang configuration sa iyong build.</p>
-          
-          <div className="text-[11px] text-slate-300 bg-black/40 p-6 rounded-2xl font-mono text-left space-y-4 border border-slate-800">
-            <p className="text-blue-400 font-bold uppercase">FORCE SETUP (Mabilisang Solusyon):</p>
-            <p>Dahil ayaw mag-refresh ng Vercel, i-paste mo ang iyong Firebase Config dito at i-click ang Setup.</p>
-            <form onSubmit={handleManualSetup} className="space-y-4">
-              <textarea 
-                name="config" 
-                placeholder='{"apiKey": "...", ...}'
-                className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl h-24 text-[9px] outline-none focus:border-blue-500"
-              ></textarea>
-              <button className="w-full bg-blue-600 text-white font-black py-3 rounded-xl uppercase text-[10px]">I-setup ang Database</button>
-            </form>
-            <p className="text-slate-500 text-[9px] mt-4 italic">Note: I-save nito ang config sa iyong browser local storage para gumana agad ang site.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (!isAuthReady) {
     return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Initializing SwifftNet Core...</div>;
@@ -342,6 +256,7 @@ export default function App() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none font-mono"><IconShield /> Remote Instances</h2>
+              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">Walang aktibong nodes.</div>}
               {myReqs.filter(r => r.type === 'new').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const isPendingRenewal = myReqs.some(r => r.type === 'renewal' && r.vpnId === req.id && r.status === 'pending');
@@ -349,7 +264,7 @@ export default function App() {
                   <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12">
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">UID: {req.id.slice(-8)}</span>
-                      <span className={`text-[10px] font-black uppercase px-5 py-2 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
                         {req.status}
                       </span>
                     </div>
