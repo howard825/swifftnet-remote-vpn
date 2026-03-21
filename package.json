@@ -1,62 +1,34 @@
 {
   "name": "swifftnet-remote",
   "version": "1.0.0",
+  "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "firebase": "^11.0.0",
-    "lucide-react": "^0.284.0"
+    "react-scripts": "5.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
-  "devDependencies": {
-    "react-scripts": "5.0.1"
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
-```
-
-3.  I-save ang iyong `App.jsx` sa loob ng folder na `src/App.jsx`.
-4.  Siguraduhing may `src/index.js` na nagtatawag sa iyong App.
-
----
-
-## Hakbang 3: Pag-upload sa GitHub
-
-1.  Mag-login sa [GitHub](https://github.com/).
-2.  Gumawa ng **New Repository**. Pangalanan itong `swifftnet-remote`.
-3.  I-upload ang iyong mga files (`src/`, `public/`, `package.json`).
-    * Maaari mong gamitin ang GitHub Desktop o i-drag-and-drop ang mga files sa website ng GitHub.
-
----
-
-## Hakbang 4: Pag-deploy sa Vercel
-
-1.  Mag-login sa [Vercel](https://vercel.com/) gamit ang iyong GitHub account.
-2.  I-click ang **Add New** > **Project**.
-3.  I-import ang repository na `swifftnet-remote`.
-4.  **Environment Variables (Napaka-importante):**
-    * Bago i-click ang Deploy, hanapin ang "Environment Variables".
-    * Magdagdag ng bago:
-        * **Key:** `__firebase_config`
-        * **Value:** (I-paste dito ang iyong buong Firebase Config JSON string)
-        * **Key:** `__app_id`
-        * **Value:** `swifftnet-pro-v2`
-5.  I-click ang **Deploy**.
-
----
-
-## Hakbang 5: Pag-deploy sa Cloudflare Pages (Alternatibo)
-
-Kung gusto mo sa Cloudflare:
-1.  Pumunta sa **Workers & Pages** sa Cloudflare Dashboard.
-2.  I-click ang **Create application** > **Pages** > **Connect to Git**.
-3.  Piliin ang iyong GitHub repo.
-4.  Sa "Build settings", piliin ang **Create React App**.
-5.  Ilagay din ang parehong Environment Variables (`__firebase_config` at `__app_id`) sa settings ng Pages pagkatapos ng initial build.
-
----
-
-### Pagsubok sa Website
-Kapag tapos na ang deployment, bibigyan ka ng Vercel o Cloudflare ng URL (halimbawa: `https://swifftnet-remote.vercel.app`). Buksan ito at subukang mag-login bilang Admin o Client para makita kung pumasok ang data sa iyong Firebase Firestore.
