@@ -25,22 +25,23 @@ const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com";
 // --- Build-Safe Environment Variable Loader ---
 const getSafeConfig = () => {
   try {
-    // 1. Suriin ang process.env (Standard para sa React/Vercel build-time injection)
-    // Ginagamit natin ang REACT_APP_ prefix dahil ito ang requirement ng create-react-app
+    // Check sa local storage kung may manual config
+    const manualConfig = typeof window !== 'undefined' ? localStorage.getItem('swifftnet_manual_config') : null;
+    if (manualConfig) return JSON.parse(manualConfig);
+
     let configRaw = null;
 
+    // Standard React variable lookup (Kailangan ng REACT_APP_ prefix)
     if (typeof process !== 'undefined' && process.env) {
       configRaw = process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config;
     }
 
-    // 2. Fallback sa window object (Runtime injection)
+    // Fallback sa window object
     if (!configRaw && typeof window !== 'undefined') {
-      configRaw = window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config;
+      configRaw = window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config || window.process?.env?.REACT_APP_FIREBASE_CONFIG;
     }
 
     if (!configRaw) return null;
-    
-    // Kung object na ang nakuha, ibalik agad. Kung string, i-parse natin.
     if (typeof configRaw === 'object' && configRaw !== null) return configRaw;
     
     return JSON.parse(configRaw);
@@ -51,23 +52,20 @@ const getSafeConfig = () => {
 };
 
 const getSafeAppId = () => {
-  let id = 'swifftnet-remote-v3'; // Default fallback
-  
+  let id = 'swifftnet-remote-v3';
   if (typeof process !== 'undefined' && process.env) {
     id = process.env.REACT_APP_APP_ID || process.env.__app_id || id;
   }
-  
   if (id === 'swifftnet-remote-v3' && typeof window !== 'undefined') {
     id = window.REACT_APP_APP_ID || window.__app_id || id;
   }
-  
   return id;
 };
 
 const firebaseConfig = getSafeConfig();
 const appId = getSafeAppId();
 
-// Initialize Firebase safely para hindi mag-error sa "re-initialization"
+// Initialize Firebase safely
 let app, auth, db;
 if (firebaseConfig) {
   try {
@@ -85,7 +83,7 @@ if (firebaseConfig) {
 
 const googleProvider = new GoogleAuthProvider();
 
-// --- Inline SVG Icons ---
+// --- Icons ---
 const IconShield = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 const IconCard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
 const IconPlus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
@@ -227,6 +225,19 @@ export default function App() {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
   };
 
+  // --- Manual Setup ---
+  const handleManualSetup = (e) => {
+    e.preventDefault();
+    const config = e.target.config.value;
+    try {
+      JSON.parse(config);
+      localStorage.setItem('swifftnet_manual_config', config);
+      window.location.reload();
+    } catch (err) {
+      alert("Mali ang format ng JSON. Siguraduhing kinopya mo ang buong object { ... }");
+    }
+  };
+
   // --- Render ---
 
   if (!firebaseConfig) {
@@ -235,19 +246,20 @@ export default function App() {
         <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
           <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
           <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none font-sans">Deployment Isyu</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-8 italic">Ang iyong configuration ay hindi pa nakakarga sa build.</p>
+          <p className="text-slate-400 text-sm leading-relaxed mb-8 italic">Hindi pa nakakarga ang configuration sa iyong build.</p>
           
           <div className="text-[11px] text-slate-300 bg-black/40 p-6 rounded-2xl font-mono text-left space-y-4 border border-slate-800">
-            <p className="text-blue-400 font-bold uppercase">PAANO ITO AYUSIN (STEP-BY-STEP):</p>
-            <p>1. Dahil hindi ka makapag-Redeploy, kailangan mong gumawa ng <strong className="text-white">New Commit</strong>.</p>
-            <p>2. I-copy ang bagong code na ito mula sa Canvas at i-save sa iyong <code className="text-emerald-400">App.jsx</code>.</p>
-            <p>3. Sa iyong terminal, i-type ang mga ito:</p>
-            <div className="bg-black p-3 rounded-lg text-slate-400">
-              git add .<br/>
-              git commit -m "Fix config loading"<br/>
-              git push
-            </div>
-            <p className="text-orange-400 text-[10px]">Awtomatikong gagawa ang Vercel ng bagong deployment na gagamit na ng iyong REACT_APP variables.</p>
+            <p className="text-blue-400 font-bold uppercase">FORCE SETUP (Mabilisang Solusyon):</p>
+            <p>Dahil ayaw mag-refresh ng Vercel, i-paste mo ang iyong Firebase Config dito at i-click ang Setup.</p>
+            <form onSubmit={handleManualSetup} className="space-y-4">
+              <textarea 
+                name="config" 
+                placeholder='{"apiKey": "...", ...}'
+                className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl h-24 text-[9px] outline-none focus:border-blue-500"
+              ></textarea>
+              <button className="w-full bg-blue-600 text-white font-black py-3 rounded-xl uppercase text-[10px]">I-setup ang Database</button>
+            </form>
+            <p className="text-slate-500 text-[9px] mt-4 italic">Note: I-save nito ang config sa iyong browser local storage para gumana agad ang site.</p>
           </div>
         </div>
       </div>
@@ -303,7 +315,10 @@ export default function App() {
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2 font-mono">{user.email}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest px-10 py-3 rounded-2xl transition-all">Sign Out</button>
+            <div className="flex gap-4">
+               {user.role === 'admin' && <button onClick={() => setView('admin')} className="bg-blue-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase">Admin Panel</button>}
+               <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest px-10 py-3 rounded-2xl transition-all">Sign Out</button>
+            </div>
           </header>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -327,7 +342,6 @@ export default function App() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none font-mono"><IconShield /> Remote Instances</h2>
-              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">Walang aktibong nodes.</div>}
               {myReqs.filter(r => r.type === 'new').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const isPendingRenewal = myReqs.some(r => r.type === 'renewal' && r.vpnId === req.id && r.status === 'pending');
@@ -340,7 +354,6 @@ export default function App() {
                       </span>
                     </div>
                     <div className="p-12 space-y-12">
-                      {req.status === 'pending' && <div className="text-center py-10 italic text-slate-600 font-bold uppercase tracking-widest animate-pulse">Wait: Admin is provisioning your node...</div>}
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-12">
                            {req.status === 'assigned' && (
@@ -435,7 +448,7 @@ export default function App() {
     );
   }
 
-  // --- Admin Interface -
+  // --- Admin Interface ---
   if (view === 'admin' && user) {
     const clients = getAllClients();
     return (
@@ -447,6 +460,7 @@ export default function App() {
               {['payments', 'requests', 'clients'].map(tab => (
                 <button key={tab} onClick={() => setAdminTab(tab)} className={`px-12 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
+              <button onClick={() => setView('dashboard')} className="px-12 py-4 rounded-[24px] text-[10px] font-black text-emerald-500 uppercase tracking-widest">Back to Dashboard</button>
             </div>
             <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
@@ -467,7 +481,6 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-                {payments.filter(p => p.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50 font-mono italic">INBOX ZERO REACHED</p>}
               </div>
             )}
 
@@ -502,7 +515,6 @@ export default function App() {
                     </form>
                   </div>
                 ))}
-                {requests.filter(r => r.status === 'pending').length === 0 && <p className="col-span-full text-slate-800 italic text-center py-40 font-black uppercase tracking-widest text-xs opacity-50 font-mono italic">NO PENDING DEPLOYMENTS</p>}
               </div>
             )}
 
