@@ -18,22 +18,23 @@ import {
 
 /**
  * --- KONPIGURASYON NG NEGOSYO ---
+ * Siguraduhing tama ang email na ito para sa Admin access.
  */
 const VPN_PRICE = 250;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 
 // --- Build-Safe Environment Variable Loader ---
-// Ang function na ito ay naghahanap sa process.env at window object para sa config
+// Inayos ang logic para sa Vercel at React build environment
 const getSafeConfig = () => {
   try {
-    // Standard React variable lookup
+    // 1. Unahing hanapin ang REACT_APP_ prefix (kailangan ng React builds)
     const configRaw = 
       (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_FIREBASE_CONFIG || process.env.__firebase_config)) ||
-      (typeof window !== 'undefined' && (window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config || window.process?.env?.REACT_APP_FIREBASE_CONFIG));
+      (typeof window !== 'undefined' && (window.REACT_APP_FIREBASE_CONFIG || window.__firebase_config));
 
     if (!configRaw) return null;
     
-    // Siguraduhin na ang kinalabasan ay isang object
+    // Kung object na siya, ibalik agad. Kung string, i-parse.
     if (typeof configRaw === 'object' && configRaw !== null) return configRaw;
     return JSON.parse(configRaw);
   } catch (err) {
@@ -45,7 +46,7 @@ const getSafeConfig = () => {
 const getSafeAppId = () => {
   const id = 
     (typeof process !== 'undefined' && process.env && (process.env.REACT_APP_APP_ID || process.env.__app_id)) ||
-    (typeof window !== 'undefined' && (window.REACT_APP_APP_ID || window.__app_id || window.process?.env?.REACT_APP_APP_ID)) ||
+    (typeof window !== 'undefined' && (window.REACT_APP_APP_ID || window.__app_id)) ||
     'swifftnet-remote-v3';
   return id;
 };
@@ -53,7 +54,7 @@ const getSafeAppId = () => {
 const firebaseConfig = getSafeConfig();
 const appId = getSafeAppId();
 
-// Initialize Firebase safely
+// Initialize Firebase safely para hindi mag-duplicate build
 let app, auth, db;
 if (firebaseConfig) {
   if (getApps().length === 0) {
@@ -218,14 +219,15 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-red-500/10 border border-red-500/30 p-10 rounded-[40px] max-w-md shadow-2xl">
           <div className="text-red-500 mb-6 flex justify-center scale-150 animate-pulse"><IconAlert /></div>
-          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Database Error</h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-6 italic">Hindi mahanap ang iyong setup.</p>
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-widest leading-none">Config Error</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6 italic">Settings not detected by the browser.</p>
           <div className="text-[11px] text-slate-300 bg-black/40 p-6 rounded-2xl font-mono text-left space-y-4 border border-slate-800">
-            <p className="text-blue-400 font-bold">HULING HAKBANG PARA GUMANA:</p>
-            <p>1. Dahil nagbago ka ng Environment Variables, kailangan mong i-rebuild ang site.</p>
-            <p>2. Pumunta sa Vercel { ' > ' } Deployments.</p>
-            <p>3. I-click ang tatlong tuldok (three dots) sa huling deployment at piliin ang <strong className="text-white uppercase font-black">REDEPLOY</strong>.</p>
-            <p className="text-orange-400 text-[10px]">Tandaan: Sa Redeploy window, i-click ang button na "Redeploy" para ma-refresh ang files.</p>
+            <p className="text-blue-400 font-bold uppercase">Paano ito ayusin:</p>
+            <p>1. Dahil nagbago ka ng Environment Variables, kailangan mo ng bagong Build.</p>
+            <p>2. Pumunta sa Vercel Dashboard sa tab na <strong>Deployments</strong>.</p>
+            <p>3. Hanapin ang <strong>PINAKABAGONG</strong> deployment (yung nasa itaas).</p>
+            <p>4. I-click ang tatlong tuldok (...) at piliin ang <strong>Redeploy</strong>.</p>
+            <p className="text-emerald-400 text-[10px]">Siguraduhing sa "Redeploy" window ay i-click ang itim na button na "Redeploy" para tanggapin ang bagong variables.</p>
           </div>
         </div>
       </div>
@@ -233,7 +235,7 @@ export default function App() {
   }
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Loading Assets...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Connecting to SwifftNet Cloud...</div>;
   }
 
   if (view === 'landing') {
@@ -241,7 +243,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in duration-500">
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <h1 className="text-5xl font-black mb-4 tracking-tighter uppercase italic text-white leading-tight">SwifftNet <span className="text-blue-600">Remote</span></h1>
-        <p className="text-slate-500 max-w-sm mb-12 text-lg font-medium leading-relaxed">Enterprise Cloud Tunnels for MikroTik, OLT, and API Management.</p>
+        <p className="text-slate-500 max-w-sm mb-12 text-lg font-medium leading-relaxed">Enterprise Cloud Infrastructure Management Portal.</p>
         
         <div className="w-full max-w-md space-y-6">
           {authError && (
@@ -271,7 +273,7 @@ export default function App() {
 /ip service set api,api-ssl,ftp,ssh,telnet address=192.168.89.0/24`;
 
     return (
-      <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
+      <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
@@ -304,8 +306,8 @@ export default function App() {
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none"><IconShield /> My Remote Nodes</h2>
-              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">No nodes deployed.</div>}
+              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none font-mono"><IconShield /> Remote Instances</h2>
+              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">Walang aktibong nodes.</div>}
               {myReqs.filter(r => r.type === 'new').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const isPendingRenewal = myReqs.some(r => r.type === 'renewal' && r.vpnId === req.id && r.status === 'pending');
@@ -318,7 +320,7 @@ export default function App() {
                       </span>
                     </div>
                     <div className="p-12 space-y-12">
-                      {req.status === 'pending' && <div className="text-center py-10 italic text-slate-600 font-bold uppercase tracking-widest animate-pulse">Wait: Provisioning your node...</div>}
+                      {req.status === 'pending' && <div className="text-center py-10 italic text-slate-600 font-bold uppercase tracking-widest animate-pulse">Wait: Admin is provisioning your node...</div>}
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-12">
                            {req.status === 'assigned' && (
@@ -326,7 +328,7 @@ export default function App() {
                            )}
                            <div className="space-y-10">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">01. WINBOX L2TP DATA</h4>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">01. Winbox Dial-out</h4>
                                 <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
@@ -334,7 +336,7 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">02. TERMINAL PAYLOAD</h4>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">02. Terminal Script</h4>
                                 <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto leading-loose italic">
                                   <pre className="whitespace-pre-wrap">{scriptBase}</pre>
                                 </div>
@@ -344,15 +346,15 @@ export default function App() {
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
                                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">Winbox</p>
-                                 <p className="text-xs font-black text-blue-400 font-mono break-all">{asgn.winbox}</p>
+                                 <p className="text-xs font-black text-blue-400 font-mono break-all">PORT: {asgn.winbox}</p>
                                </div>
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">API Port</p>
-                                 <p className="text-xs font-black text-indigo-400 font-mono break-all">{asgn.api}</p>
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">API</p>
+                                 <p className="text-xs font-black text-indigo-400 font-mono break-all">PORT: {asgn.api}</p>
                                </div>
                                <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">SSH Access</p>
-                                 <p className="text-xs font-black text-emerald-400 font-mono break-all">{asgn.ssh}</p>
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">SSH</p>
+                                 <p className="text-xs font-black text-emerald-400 font-mono break-all">PORT: {asgn.ssh}</p>
                                </div>
                                <div className="col-span-full flex flex-col md:flex-row justify-between items-center bg-slate-950/50 p-10 rounded-[40px] border border-slate-800 gap-8 mt-6">
                                  <div>
@@ -376,7 +378,7 @@ export default function App() {
             </div>
 
             <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest leading-none"><IconCard /> Fund Account</h2>
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest leading-none font-mono"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
                 <form onSubmit={(e) => { 
                   e.preventDefault(); 
@@ -417,7 +419,7 @@ export default function App() {
   if (view === 'admin' && user) {
     const clients = getAllClients();
     return (
-      <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
+      <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-7xl mx-auto space-y-16 animate-in fade-in duration-700">
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Admin <span className="text-blue-500">Terminal</span></h1>
@@ -426,7 +428,7 @@ export default function App() {
                 <button key={tab} onClick={() => setAdminTab(tab)} className={`px-12 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
             </div>
-            <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full">Sign Out</button>
+            <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
 
           <div className="animate-in fade-in duration-700">
@@ -504,8 +506,8 @@ export default function App() {
                             <div className="space-y-4">
                               {assignments.filter(a => a.clientEmail === email).map((t, i) => (
                                 <div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner">
-                                   <span className="text-blue-500 font-mono text-[11px] font-black uppercase tracking-widest">W: {t.winbox}</span>
-                                   <span className="text-slate-600 font-mono text-[11px] font-black uppercase tracking-widest italic">EXP: {t.expiry}</span>
+                                   <span className="text-blue-500 font-mono text-[11px] font-black uppercase tracking-widest">PORT: {t.winbox}</span>
+                                   <span className="text-slate-600 font-mono text-[11px] font-black uppercase tracking-widest italic leading-none">EXP: {t.expiry}</span>
                                 </div>
                               ))}
                             </div>
