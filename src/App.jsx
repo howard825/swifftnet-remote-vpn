@@ -66,7 +66,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-
+  
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -221,7 +221,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
+          
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
               {user.photo && <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" />}
@@ -291,7 +291,7 @@ export default function App() {
                            {req.status === 'assigned' && (
                              <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-emerald-500 transition-all uppercase tracking-widest">DEPLOYMENT FINISHED</button>
                            )}
-
+                           
                            <div className="space-y-10">
                               {/* STEP 01: WINBOX SETUP */}
                               <div className="space-y-4">
@@ -413,13 +413,13 @@ export default function App() {
                   <IconCode />
                   <h2 className="text-[10px] font-black uppercase tracking-[0.2em] font-mono">System Architect</h2>
                 </div>
-
+                
                 <div className="space-y-4">
                   <div>
                     <p className="text-2xl font-black tracking-tighter text-white italic">Howard Kingsley Ramos</p>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Lead Developer & Network Engineer</p>
                   </div>
-
+                  
                   <div className="pt-4 border-t border-slate-800/50">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Platform</span>
@@ -427,7 +427,6 @@ export default function App() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Region</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase">PH / Tuguegarao</span>
                       <span className="text-[9px] font-black text-slate-400 uppercase">PH / Cagayan Valley</span>
                     </div>
                   </div>
