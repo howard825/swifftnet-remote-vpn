@@ -92,7 +92,6 @@ export default function App() {
   useEffect(() => {
     if (!user || !db) return;
 
-    // Follow strict pathing rules for artifacts environment
     const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
     const rCol = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
     const aCol = collection(db, 'artifacts', appId, 'public', 'data', 'assignments');
@@ -241,13 +240,11 @@ export default function App() {
 
           {/* Stats & Pricelist Grid */}
           <div className="grid md:grid-cols-4 gap-8">
-            {/* Balance Card */}
             <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
               <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-2 font-mono">Iyong Balance</p>
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
 
-            {/* NEW: Pricelist Card */}
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] shadow-xl flex flex-col justify-center">
                <div className="flex items-center gap-3 mb-4">
                   <span className="text-emerald-500"><IconTag /></span>
@@ -262,7 +259,6 @@ export default function App() {
                </div>
             </div>
 
-            {/* Active Tunnels Card */}
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] md:col-span-2 flex flex-col md:flex-row items-center justify-between px-12 gap-6">
                <div className="text-center md:text-left">
                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1 font-mono">Active Tunnels</p>
@@ -276,7 +272,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Main Dashboard Layout */}
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none font-mono"><IconShield /> Remote Instances</h2>
@@ -300,7 +295,10 @@ export default function App() {
                            )}
                            <div className="space-y-10">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">01. Winbox Dial-out</h4>
+                                {/* UPDATED INSTRUCTION HEADER BELOW */}
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">
+                                  01. PPP &gt; + &gt; L2TP CLIENT &gt; DIAL OUT TAB
+                                </h4>
                                 <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
@@ -349,7 +347,6 @@ export default function App() {
               })}
             </div>
 
-            {/* Funding Column */}
             <div className="space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest leading-none font-mono"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl font-sans">
