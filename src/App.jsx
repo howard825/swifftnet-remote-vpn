@@ -427,7 +427,7 @@ export default function App() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Region</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase">PH / Tuguegarao</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">PH / Cagayan Valley</span>
                     </div>
                   </div>
                 </div>
