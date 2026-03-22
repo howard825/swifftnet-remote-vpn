@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * --- KONPIGURASYON NG NEGOSYO ---
+ * --- BUSINESS CONFIGURATION ---
  */
 const VPN_PRICE = 180;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
@@ -33,6 +33,7 @@ const firebaseConfig = {
   measurementId: "G-EQ7VZ079W9"
 };
 
+// Initialize Firebase
 let app, auth, db;
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -44,7 +45,9 @@ db = getFirestore(app);
 
 const googleProvider = new GoogleAuthProvider();
 
-// --- Icons ---
+/**
+ * --- UI ICONS ---
+ */
 const IconShield = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 const IconCard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
 const IconPlus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
@@ -54,6 +57,7 @@ const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="no
 const IconTag = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
 const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const IconCode = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -61,12 +65,13 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('payments');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState(null);
-  const [copiedId, setCopiedId] = useState(null); // Feedback for copying
+  const [copiedId, setCopiedId] = useState(null);
   
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  // --- Auth & Data Hooks ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
@@ -99,6 +104,7 @@ export default function App() {
     return () => { unsubP(); unsubR(); unsubA(); };
   }, [user]);
 
+  // --- Methods ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -172,15 +178,15 @@ export default function App() {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
   };
 
-  // --- NEW: Copy Helper ---
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // --- Views ---
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Initializing SwifftNet Core...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono italic">Initializing SwifftNet Core...</div>;
   }
 
   if (view === 'landing') {
@@ -215,6 +221,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
               {user.photo && <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" />}
@@ -262,7 +269,9 @@ export default function App() {
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest leading-none font-mono"><IconShield /> Remote Instances</h2>
+              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest font-mono italic">
+                <IconShield /> Remote Instances
+              </h2>
               {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">Walang aktibong nodes.</div>}
               {myReqs.filter(r => r.type === 'new').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
@@ -275,25 +284,36 @@ export default function App() {
                         {req.status}
                       </span>
                     </div>
+
                     <div className="p-12 space-y-12">
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
-                        <div className="space-y-12">
+                        <div className="space-y-12 animate-in fade-in slide-in-from-top-2">
                            {req.status === 'assigned' && (
                              <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-emerald-500 transition-all uppercase tracking-widest">DEPLOYMENT FINISHED</button>
                            )}
+                           
                            <div className="space-y-10">
+                              {/* STEP 01: WINBOX SETUP */}
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">01. PPP &gt; + &gt; L2TP CLIENT &gt; DIAL OUT TAB</h4>
-                                <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
-                                   <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
-                                   <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
-                                   <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">01. Winbox GUI Configuration</h4>
+                                <div className="space-y-6">
+                                  <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
+                                    Gamitin ang Winbox GUI. Sa Winbox GUI, Click ang <strong className="text-white">Interfaces</strong>, Click ang <strong className="text-white">+</strong>, Click ang <strong className="text-white">L2TP Client</strong>, Click ang <strong className="text-white">Dial out tab</strong>.
+                                    <br/><br/>
+                                    E copy paste ng tama ang mga data na eto sa L2TP Client.
+                                  </p>
+                                  <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
+                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
+                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
+                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
+                                  </div>
                                 </div>
                               </div>
+
+                              {/* STEP 02: TERMINAL SCRIPT */}
                               <div className="space-y-4">
-                                {/* COPY BUTTON ADDED TO TERMINAL SCRIPT SECTION */}
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                  <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none italic font-mono uppercase">02. Terminal Script</h4>
+                                  <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none italic font-mono">02. Terminal Script</h4>
                                   <button 
                                     onClick={() => handleCopy(scriptBase, `script-${req.id}`)}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${copiedId === `script-${req.id}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
@@ -305,10 +325,24 @@ export default function App() {
                                   <pre className="whitespace-pre-wrap">{scriptBase}</pre>
                                 </div>
                               </div>
+
+                              {/* STEP 03: REMOTE ACCESS INFO */}
+                              <div className="space-y-4">
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">03. Remote Access Instructions</h4>
+                                <div className="space-y-6">
+                                  <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
+                                    Pwede mo ng e remote ang iyong router gamit ang Winbox at api or ssh sa desktop o laptop, o Mikrotik app sa cellphone. Gamitin lamang ang address at port na eto:
+                                  </p>
+                                  <div className="bg-blue-600/10 p-8 rounded-[32px] border border-blue-500/20 text-center font-mono text-sm">
+                                    <span className="text-blue-400 font-black">remote.swifftnet.site:</span> <span className="text-white italic">[ your port number na naka assign, please check the ports below ]</span>
+                                  </div>
+                                </div>
+                              </div>
                            </div>
+
                            {req.status === 'active' && (
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner relative group">
+                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
                                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">Winbox</p>
                                  <p className="text-xs font-black text-blue-400 font-mono break-all">PORT: {asgn.winbox}</p>
                                </div>
@@ -342,7 +376,7 @@ export default function App() {
             </div>
 
             <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest leading-none font-mono"><IconCard /> Fund Account</h2>
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest font-mono italic"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl font-sans">
                 <form onSubmit={(e) => { 
                   e.preventDefault(); 
@@ -372,6 +406,32 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* DEVELOPER INFORMATION SECTION */}
+              <div className="bg-slate-900/40 p-10 rounded-[50px] border border-slate-800/50 space-y-6 shadow-2xl font-sans animate-in fade-in zoom-in-95 duration-700">
+                <div className="flex items-center gap-4 text-blue-500 mb-2">
+                  <IconCode />
+                  <h2 className="text-[10px] font-black uppercase tracking-[0.2em] font-mono">System Architect</h2>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-2xl font-black tracking-tighter text-white italic">Howard Kingsley Ramos</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Lead Developer & Network Engineer</p>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-slate-800/50">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Platform</span>
+                      <span className="text-[9px] font-black text-blue-400 uppercase font-mono">SwifftNet v3.0</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Region</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">PH / Tuguegarao</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -379,6 +439,7 @@ export default function App() {
     );
   }
 
+  // --- Admin Interface ---
   if (view === 'admin' && user) {
     const clients = getAllClients();
     return (
@@ -394,6 +455,7 @@ export default function App() {
             </div>
             <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
+
           <div className="animate-in fade-in duration-700">
             {adminTab === 'payments' && (
               <div className="grid md:grid-cols-3 gap-10">
@@ -412,6 +474,7 @@ export default function App() {
                 ))}
               </div>
             )}
+
             {adminTab === 'requests' && (
               <div className="grid md:grid-cols-2 gap-12">
                 {requests.filter(r => r.status === 'pending').map(r => (
@@ -445,6 +508,7 @@ export default function App() {
                 ))}
               </div>
             )}
+
             {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <div className="overflow-x-auto pr-4 font-mono">
@@ -483,5 +547,6 @@ export default function App() {
       </div>
     );
   }
+
   return null;
 }
