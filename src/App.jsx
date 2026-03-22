@@ -19,7 +19,7 @@ import {
 /**
  * --- KONPIGURASYON NG NEGOSYO ---
  */
-const VPN_PRICE = 250;
+const VPN_PRICE = 180;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; // Identity folder sa Firestore
 
