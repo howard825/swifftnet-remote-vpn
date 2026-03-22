@@ -21,9 +21,8 @@ import {
  */
 const VPN_PRICE = 180;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
-const appId = "swifftnet-remote-v3"; // Identity folder sa Firestore
+const appId = "swifftnet-remote-v3"; 
 
-// Hardcoded Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyD7KSnje8RL_y6p2YVJB1C449Sudvhv6Ek",
   authDomain: "swifftnet-remote.firebaseapp.com",
@@ -34,7 +33,6 @@ const firebaseConfig = {
   measurementId: "G-EQ7VZ079W9"
 };
 
-// Initialize Firebase safely
 let app, auth, db;
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -54,6 +52,8 @@ const IconRefresh = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="
 const IconGoogle = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>;
 const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const IconTag = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -61,12 +61,12 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('payments');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null); // Feedback for copying
   
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
-  // --- Auth Observer ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
@@ -88,22 +88,17 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- Real-time Firestore Listeners ---
   useEffect(() => {
     if (!user || !db) return;
-
     const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
     const rCol = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
     const aCol = collection(db, 'artifacts', appId, 'public', 'data', 'assignments');
-
     const unsubP = onSnapshot(pCol, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubR = onSnapshot(rCol, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubA = onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
     return () => { unsubP(); unsubR(); unsubA(); };
   }, [user]);
 
-  // --- Calculations ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -117,13 +112,11 @@ export default function App() {
     return Array.from(emails);
   };
 
-  // --- Actions ---
   const handleGoogleLogin = async () => {
     setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      console.error("Login failed:", err);
       if (err.code === 'auth/unauthorized-domain') {
         setAuthError("Domain not authorized. Please add your website URL to Firebase Authorized Domains.");
       } else {
@@ -179,7 +172,12 @@ export default function App() {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
   };
 
-  // --- Render ---
+  // --- NEW: Copy Helper ---
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   if (!isAuthReady) {
     return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono">Initializing SwifftNet Core...</div>;
@@ -191,7 +189,6 @@ export default function App() {
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <h1 className="text-5xl font-black mb-4 tracking-tighter uppercase italic text-white leading-tight">SwifftNet <span className="text-blue-600">Remote</span></h1>
         <p className="text-slate-500 max-w-sm mb-12 text-lg font-medium leading-relaxed font-sans">Cloud Infrastructure Management para sa MikroTik at OLT nodes.</p>
-        
         <div className="w-full max-w-md space-y-6">
           {authError && (
             <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-xs flex gap-4 animate-in fade-in zoom-in-95">
@@ -199,11 +196,7 @@ export default function App() {
               <p className="text-left font-medium leading-relaxed font-sans">{authError}</p>
             </div>
           )}
-          
-          <button 
-            onClick={handleGoogleLogin} 
-            className="w-full bg-white text-slate-900 px-10 py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest font-sans"
-          >
+          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 px-10 py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest font-sans">
             <IconGoogle /> Sign in with Google
           </button>
         </div>
@@ -222,8 +215,6 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          
-          {/* Header */}
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
               {user.photo && <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" />}
@@ -238,13 +229,11 @@ export default function App() {
             </div>
           </header>
 
-          {/* Stats & Pricelist Grid */}
           <div className="grid md:grid-cols-4 gap-8">
             <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
               <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-2 font-mono">Iyong Balance</p>
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
-
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] shadow-xl flex flex-col justify-center">
                <div className="flex items-center gap-3 mb-4">
                   <span className="text-emerald-500"><IconTag /></span>
@@ -258,7 +247,6 @@ export default function App() {
                  <p className="text-[9px] text-slate-600 font-bold uppercase italic leading-tight">All-in: Winbox, API, SSH Ports</p>
                </div>
             </div>
-
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] md:col-span-2 flex flex-col md:flex-row items-center justify-between px-12 gap-6">
                <div className="text-center md:text-left">
                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1 font-mono">Active Tunnels</p>
@@ -295,10 +283,7 @@ export default function App() {
                            )}
                            <div className="space-y-10">
                               <div className="space-y-4">
-                                {/* UPDATED INSTRUCTION HEADER BELOW */}
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono">
-                                  01. PPP &gt; + &gt; L2TP CLIENT &gt; DIAL OUT TAB
-                                </h4>
+                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">01. PPP &gt; + &gt; L2TP CLIENT &gt; DIAL OUT TAB</h4>
                                 <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
                                    <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
@@ -306,7 +291,16 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 leading-none italic font-mono uppercase">02. Terminal Script</h4>
+                                {/* COPY BUTTON ADDED TO TERMINAL SCRIPT SECTION */}
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                                  <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none italic font-mono uppercase">02. Terminal Script</h4>
+                                  <button 
+                                    onClick={() => handleCopy(scriptBase, `script-${req.id}`)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${copiedId === `script-${req.id}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                                  >
+                                    {copiedId === `script-${req.id}` ? <><IconCheck /> Copied!</> : <><IconCopy /> Copy Script</>}
+                                  </button>
+                                </div>
                                 <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto leading-loose italic">
                                   <pre className="whitespace-pre-wrap">{scriptBase}</pre>
                                 </div>
@@ -314,7 +308,7 @@ export default function App() {
                            </div>
                            {req.status === 'active' && (
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
+                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner relative group">
                                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">Winbox</p>
                                  <p className="text-xs font-black text-blue-400 font-mono break-all">PORT: {asgn.winbox}</p>
                                </div>
@@ -385,7 +379,6 @@ export default function App() {
     );
   }
 
-  // --- Admin Interface ---
   if (view === 'admin' && user) {
     const clients = getAllClients();
     return (
@@ -401,7 +394,6 @@ export default function App() {
             </div>
             <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
-
           <div className="animate-in fade-in duration-700">
             {adminTab === 'payments' && (
               <div className="grid md:grid-cols-3 gap-10">
@@ -420,7 +412,6 @@ export default function App() {
                 ))}
               </div>
             )}
-
             {adminTab === 'requests' && (
               <div className="grid md:grid-cols-2 gap-12">
                 {requests.filter(r => r.status === 'pending').map(r => (
@@ -454,7 +445,6 @@ export default function App() {
                 ))}
               </div>
             )}
-
             {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <div className="overflow-x-auto pr-4 font-mono">
@@ -493,6 +483,5 @@ export default function App() {
       </div>
     );
   }
-
   return null;
 }
