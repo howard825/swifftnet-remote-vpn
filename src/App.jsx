@@ -58,6 +58,7 @@ const IconTag = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none
 const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconCode = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
+const IconList = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -293,7 +294,6 @@ export default function App() {
                            )}
                            
                            <div className="space-y-10">
-                              {/* STEP 01: WINBOX SETUP */}
                               <div className="space-y-4">
                                 <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">01. Winbox GUI Configuration</h4>
                                 <div className="space-y-6">
@@ -310,7 +310,6 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* STEP 02: TERMINAL SCRIPT */}
                               <div className="space-y-4">
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                                   <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none italic font-mono">02. Terminal Script</h4>
@@ -326,7 +325,6 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* STEP 03: REMOTE ACCESS INFO */}
                               <div className="space-y-4">
                                 <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">03. Remote Access Instructions</h4>
                                 <div className="space-y-6">
@@ -442,16 +440,33 @@ export default function App() {
   // --- Admin Interface ---
   if (view === 'admin' && user) {
     const clients = getAllClients();
+    const totalRevenue = payments
+      .filter(p => p.status === 'confirmed')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
         <div className="max-w-7xl mx-auto space-y-16 animate-in fade-in duration-700">
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Admin <span className="text-blue-500">Terminal</span></h1>
+            <div>
+               <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Admin <span className="text-blue-500">Terminal</span></h1>
+               <div className="flex items-center gap-2 mt-4 bg-emerald-500/5 border border-emerald-500/10 px-6 py-2 rounded-full">
+                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Total Confirmed Revenue:</span>
+                  <span className="text-emerald-400 font-mono font-black italic">₱{totalRevenue}</span>
+               </div>
+            </div>
             <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-hidden">
-              {['payments', 'requests', 'clients'].map(tab => (
-                <button key={tab} onClick={() => setAdminTab(tab)} className={`px-12 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
+              {[
+                {id: 'payments', label: 'Queue', icon: <IconRefresh />},
+                {id: 'requests', label: 'Requests', icon: <IconPlus />},
+                {id: 'clients', label: 'Clients', icon: <IconGoogle />},
+                {id: 'transactions', label: 'History', icon: <IconList />}
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setAdminTab(tab.id)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-3 ${adminTab === tab.id ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600 hover:text-slate-400'}`}>
+                   {tab.icon} {tab.label}
+                </button>
               ))}
-              <button onClick={() => setView('dashboard')} className="px-12 py-4 rounded-[24px] text-[10px] font-black text-emerald-500 uppercase tracking-widest">Back to Dashboard</button>
+              <button onClick={() => setView('dashboard')} className="px-8 py-4 rounded-[24px] text-[10px] font-black text-emerald-500 uppercase tracking-widest">Back to Dashboard</button>
             </div>
             <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
@@ -472,6 +487,9 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                {payments.filter(p => p.status === 'pending').length === 0 && (
+                  <div className="col-span-full py-24 border border-dashed border-slate-800 rounded-[60px] text-center text-slate-700 font-black uppercase italic text-xs tracking-[0.2em]">Walang pending na bayad sa queue.</div>
+                )}
               </div>
             )}
 
@@ -534,6 +552,43 @@ export default function App() {
                                 </div>
                               ))}
                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {adminTab === 'transactions' && (
+              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in duration-500">
+                <div className="overflow-x-auto font-mono">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-800/80 text-[11px] uppercase font-black text-slate-700 tracking-widest">
+                      <tr>
+                        <th className="p-10">Date</th>
+                        <th className="p-10">Client Email</th>
+                        <th className="p-10">Reference No</th>
+                        <th className="p-10 text-right">Amount</th>
+                        <th className="p-10 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {[...payments].sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => (
+                        <tr key={p.id} className="hover:bg-slate-800/20 transition-all">
+                          <td className="p-10 text-slate-500 text-[10px] font-bold">{p.date}</td>
+                          <td className="p-10 font-black text-white italic truncate max-w-[200px]">{p.email}</td>
+                          <td className="p-10 text-blue-400 font-black uppercase tracking-tighter">{p.refNo}</td>
+                          <td className="p-10 text-right font-black text-white text-xl">₱{p.amount}</td>
+                          <td className="p-10 text-center">
+                            <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${
+                              p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 
+                              p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
+                              'text-orange-500 border-orange-500/20 bg-orange-500/5'
+                            }`}>
+                              {p.status}
+                            </span>
                           </td>
                         </tr>
                       ))}
