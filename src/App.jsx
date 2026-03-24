@@ -216,6 +216,7 @@ export default function App() {
     const myReqs = requests.filter(r => r.email === user.email);
     const myPays = payments.filter(p => p.email === user.email);
     const scriptBase = `/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 
+/ip firewall filter add action=accept chain=input comment="" place-before=*0 src-address=192.168.89.0/24
 /ip firewall filter add action=accept chain=forward src-address=192.168.89.0/24
 /ip service set api,api-ssl,ftp,ssh,telnet address=192.168.89.0/24`;
 
