@@ -92,7 +92,7 @@ export default function App() {
           name: fUser.displayName || fUser.email.split('@')[0],
           email: fUser.email,
           role: role,
-          createdAt: fUser.metadata.creationTime, // Track account age
+          createdAt: fUser.metadata.creationTime,
         });
         setView(role === 'admin' ? 'admin' : 'dashboard');
       } else {
@@ -115,6 +115,9 @@ export default function App() {
     return () => { unsubP(); unsubR(); unsubA(); };
   }, [user]);
 
+  /**
+   * --- CORE UTILITIES ---
+   */
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -123,6 +126,14 @@ export default function App() {
     return deposits - spent;
   };
 
+  const getAllClients = () => {
+    const emails = new Set([...payments.map(p => p.email), ...requests.map(r => r.email)]);
+    return Array.from(emails);
+  };
+
+  /**
+   * --- AUTH METHODS ---
+   */
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setAuthError(null);
@@ -142,6 +153,9 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
+  /**
+   * --- DATA SUBMISSION ---
+   */
   const submitDeposit = async (amount, refNo) => {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
       email: user.email, amount, refNo, status: 'pending', date: new Date().toLocaleDateString()
@@ -186,6 +200,9 @@ export default function App() {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic">SwifftNet Core Loading...</div>;
 
+  /**
+   * --- VIEWS ---
+   */
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6">
@@ -216,10 +233,9 @@ export default function App() {
     const myPays = payments.filter(p => p.email === user.email);
     const hasTrialUsed = myReqs.some(r => r.type === 'trial');
     
-    // Logic for NEW account (within last 24 hours)
     const creationDate = new Date(user.createdAt).getTime();
     const now = new Date().getTime();
-    const isAccountNew = (now - creationDate) < (24 * 60 * 60 * 1000); // 24 Hours
+    const isAccountNew = (now - creationDate) < (24 * 60 * 60 * 1000); 
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -241,7 +257,6 @@ export default function App() {
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
 
-            {/* Trial Box - Only shows if Account is NEW and Trial NOT USED */}
             {!hasTrialUsed && isAccountNew && (
               <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
                 <p className="text-[10px] font-black text-indigo-400 uppercase">NEW USER PROMO</p>
