@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
-import emailjs from '@emailjs/browser'; // 1. Import EmailJS
+import emailjs from '@emailjs/browser';
 import { 
   getAuth, 
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
-  signOut 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -24,10 +26,9 @@ const VPN_PRICE = 180;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
 
-// --- EMAILJS CONFIGURATION ---
-const EJS_SERVICE_ID = "service_7s9tg36"; // Replace with your ID
-const EJS_TEMPLATE_ID = "template_9pjx12n"; // Replace with your ID
-const EJS_PUBLIC_KEY = "gULI8936r5B6AVPx1"; // Replace with your Key
+const EJS_SERVICE_ID = "service_7s9tg36"; 
+const EJS_TEMPLATE_ID = "template_9pjx12n"; 
+const EJS_PUBLIC_KEY = "gULI8936r5B6AVPx1"; 
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7KSnje8RL_y6p2YVJB1C449Sudvhv6Ek",
@@ -39,7 +40,6 @@ const firebaseConfig = {
   measurementId: "G-EQ7VZ079W9"
 };
 
-// Initialize Firebase
 let app, auth, db;
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -65,6 +65,7 @@ const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconCode = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
 const IconList = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
+const IconMail = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -74,24 +75,22 @@ export default function App() {
   const [authError, setAuthError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   
+  // Auth Form State
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [passInput, setPassInput] = useState("");
+
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
-  // --- 2. EMAIL AUTOMATION HELPER ---
   const sendEmail = (toEmail, subject, body) => {
-    const templateParams = {
-      to_email: toEmail,
-      subject: subject,
-      message: body,
-    };
-
+    const templateParams = { to_email: toEmail, subject: subject, message: body };
     emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY)
       .then(() => console.log(`Email Sent to ${toEmail}`))
       .catch((err) => console.error("Email Error:", err));
   };
 
-  // --- Auth & Data Hooks ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
@@ -124,12 +123,12 @@ export default function App() {
     return () => { unsubP(); unsubR(); unsubA(); };
   }, [user]);
 
-  // --- Methods ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
       .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const spent = requests.filter(r => r.email === email).length * VPN_PRICE;
+    // Don't charge for trials
+    const spent = requests.filter(r => r.email === email && r.type !== 'trial').length * VPN_PRICE;
     return deposits - spent;
   };
 
@@ -138,52 +137,74 @@ export default function App() {
     return Array.from(emails);
   };
 
+  /**
+   * --- AUTH METHODS ---
+   */
   const handleGoogleLogin = async () => {
     setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      if (err.code === 'auth/unauthorized-domain') {
-        setAuthError("Domain not authorized. Please add your website URL to Firebase Authorized Domains.");
+      setAuthError(err.message);
+    }
+  };
+
+  const handleEmailAuth = async (e) => {
+    e.preventDefault();
+    setAuthError(null);
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, emailInput, passInput);
       } else {
-        setAuthError(`Error: ${err.message}`);
+        await signInWithEmailAndPassword(auth, emailInput, passInput);
       }
+    } catch (err) {
+      setAuthError(err.message);
     }
   };
 
   const handleLogout = () => signOut(auth);
 
+  /**
+   * --- DATA METHODS ---
+   */
   const submitDeposit = async (amount, refNo) => {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
       email: user.email, amount, refNo, status: 'pending', date: new Date().toLocaleDateString()
     });
   };
 
-  // --- 3. UPDATED STATUS (Triggers Email) ---
   const updatePaymentStatus = async (id, status, clientEmail) => {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'payments', id), { status });
-    
     const subject = status === 'confirmed' ? "SwifftNet: Payment Success!" : "SwifftNet: Payment Denied";
     const body = status === 'confirmed' 
-      ? `Good news! Your payment has been confirmed. Your SwifftNet balance is now updated. You may now request your vpn credentials on our website.`
-      : `Unfortunately, your payment reference was not verified. Please check your G-Ref and try again.`;
-
+      ? `Good news! Your payment has been confirmed. Balance updated.`
+      : `Unfortunately, your payment reference was not verified.`;
     sendEmail(clientEmail, subject, body);
   };
 
-  // --- 4. UPDATED REQUEST (Notifies Admin) ---
+  // Regular Request
   const createVpnRequest = async (type = 'new', vpnId = null) => {
     const balance = getUserBalance(user.email);
-    if (balance >= VPN_PRICE) {
+    if (balance >= VPN_PRICE || type === 'renewal') {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
         email: user.email, status: 'pending', type, vpnId, date: new Date().toLocaleDateString()
       });
-
-      sendEmail(ADMIN_EMAIL, "New Node Request Queue", `Client ${user.email} has requested a node (${type}). Check the Terminal.`);
+      sendEmail(ADMIN_EMAIL, "New Request Queue", `Client ${user.email} requested a node.`);
     }
   };
 
-  // --- 5. UPDATED ASSIGNMENT (Notifies Client) ---
+  // 7-Day Trial Request
+  const createTrialRequest = async () => {
+    const alreadyTrialed = requests.some(r => r.email === user.email && r.type === 'trial');
+    if (alreadyTrialed) return alert("System record: Trial already requested for this account.");
+
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
+      email: user.email, status: 'pending', type: 'trial', date: new Date().toLocaleDateString()
+    });
+    sendEmail(ADMIN_EMAIL, "Free Trial Alert", `Client ${user.email} requested a 7-day trial.`);
+  };
+
   const adminAssignTunnel = async (reqId, email, data, type) => {
     if (type === 'renewal') {
       const target = assignments.find(a => a.requestId === data.vpnId);
@@ -195,17 +216,19 @@ export default function App() {
         });
       }
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
-      sendEmail(email, "SwifftNet: Renewal Success", "Your instance has been successfully renewed. Thank you!");
     } else {
       const exp = new Date();
-      exp.setDate(exp.getDate() + Number(data.days));
+      // Force 7 days if type is trial
+      const days = type === 'trial' ? 7 : Number(data.days);
+      exp.setDate(exp.getDate() + days);
+
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assignments'), {
         requestId: reqId, clientEmail: email, user: data.u, pass: data.p,
-        winbox: data.wp, api: data.ap, ssh: data.ssh, expiry: exp.toLocaleDateString()
+        winbox: data.wp, api: data.ap, ssh: data.ssh, expiry: exp.toLocaleDateString(),
+        isTrial: type === 'trial'
       });
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
-      
-      sendEmail(email, "Instance Ready! 🚀", "Your MikroTik Remote Instance has been authorized. Login to your SwifftNet dashboard to view your ports and scripts.");
+      sendEmail(email, "SwifftNet Instance Ready!", "Login to your dashboard to view credentials.");
     }
   };
 
@@ -219,27 +242,50 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // --- Views ---
-  if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-widest font-mono italic">Initializing SwifftNet Core...</div>;
-  }
+  if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic">Initializing SwifftNet Core...</div>;
 
   if (view === 'landing') {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in duration-500">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
-        <h1 className="text-5xl font-black mb-4 tracking-tighter uppercase italic text-white leading-tight">SwifftNet <span className="text-blue-600">Remote</span></h1>
-        <p className="text-slate-500 max-w-sm mb-12 text-lg font-medium leading-relaxed font-sans">Cloud Infrastructure Management para sa MikroTik at OLT nodes.</p>
-        <div className="w-full max-w-md space-y-6">
-          {authError && (
-            <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-3xl text-red-400 text-xs flex gap-4 animate-in fade-in zoom-in-95">
-              <div className="flex-shrink-0"><IconAlert /></div>
-              <p className="text-left font-medium leading-relaxed font-sans">{authError}</p>
+        <h1 className="text-5xl font-black mb-2 tracking-tighter uppercase italic">SwifftNet <span className="text-blue-600">Remote</span></h1>
+        <p className="text-slate-500 mb-12 font-medium">Cloud Infrastructure for MikroTik & OLT</p>
+        
+        <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-6">
+          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
+          
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            <div className="relative">
+              <span className="absolute left-5 top-5 text-slate-500"><IconMail /></span>
+              <input type="email" placeholder="Email Address" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 pl-14 rounded-3xl outline-none focus:border-blue-500 font-bold" />
             </div>
-          )}
-          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 px-10 py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest font-sans">
-            <IconGoogle /> Sign in with Google
+            <div className="relative">
+              <span className="absolute left-5 top-5 text-slate-500"><IconCode /></span>
+              <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 pl-14 rounded-3xl outline-none focus:border-blue-500 font-bold" />
+            </div>
+            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20">
+              {isSignUp ? 'Register' : 'Login'}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-4 py-2">
+            <div className="h-px bg-slate-800 flex-1"></div>
+            <span className="text-[10px] font-black text-slate-600 uppercase">OR</span>
+            <div className="h-px bg-slate-800 flex-1"></div>
+          </div>
+
+          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-widest">
+            <IconGoogle /> Continue with Google
           </button>
+
+          <p className="text-center text-xs font-bold text-slate-500 mt-6">
+            {isSignUp ? "Already have an account?" : "No account yet?"}{" "}
+            <button onClick={() => setIsSignUp(!isSignUp)} className="text-blue-500 underline uppercase tracking-tighter ml-1">
+              {isSignUp ? 'Login' : 'Sign Up Now'}
+            </button>
+          </p>
+          
+          {authError && <p className="text-red-400 text-[10px] text-center font-bold bg-red-500/10 p-4 rounded-2xl">{authError}</p>}
         </div>
       </div>
     );
@@ -249,10 +295,10 @@ export default function App() {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
     const myPays = payments.filter(p => p.email === user.email);
+    const hasTrial = myReqs.some(r => r.type === 'trial');
     const scriptBase = `/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 
 /ip firewall filter add action=accept chain=input comment="" place-before=*0 src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=forward src-address=192.168.89.0/24
-/ip service set api,api-ssl,ftp,ssh,telnet address=192.168.89.0/24`;
+/ip service set api,api-ssl,ssh address=192.168.89.0/24`;
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -260,10 +306,10 @@ export default function App() {
           
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
-              {user.photo && <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" />}
+              {user.photo ? <img src={user.photo} alt="profile" className="w-16 h-16 rounded-full border-4 border-blue-600 shadow-lg" /> : <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl">{user.name[0]}</div>}
               <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2 font-mono">{user.email}</p>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">{user.email}</p>
               </div>
             </div>
             <div className="flex gap-4">
@@ -274,132 +320,76 @@ export default function App() {
 
           <div className="grid md:grid-cols-4 gap-8">
             <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
-              <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-2 font-mono">Iyong Balance</p>
+              <p className="text-blue-400 text-[10px] font-black uppercase mb-2">Iyong Balance</p>
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] shadow-xl flex flex-col justify-center">
-               <div className="flex items-center gap-3 mb-4">
-                  <span className="text-emerald-500"><IconTag /></span>
-                  <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest font-mono">Service Rates</p>
-               </div>
-               <div className="space-y-2">
-                 <div className="flex justify-between items-end border-b border-slate-800/50 pb-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase">1 Year Access</span>
-                    <span className="text-2xl font-black text-white italic">₱{VPN_PRICE}</span>
-                 </div>
-                 <p className="text-[9px] text-slate-600 font-bold uppercase italic leading-tight">All-in: Winbox, API, SSH Ports</p>
-               </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[40px] md:col-span-2 flex flex-col md:flex-row items-center justify-between px-12 gap-6">
-               <div className="text-center md:text-left">
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1 font-mono">Active Tunnels</p>
+
+            {/* Trial Tunnel Button */}
+            {!hasTrial && (
+              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] shadow-xl md:col-span-1 flex flex-col items-center justify-center text-center gap-4">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">PROMO</p>
+                <button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all">
+                  Request 7-Day Trial
+                </button>
+                <p className="text-[9px] text-indigo-400/50 italic">One-time free test tunnel</p>
+              </div>
+            )}
+
+            <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] shadow-xl flex flex-col md:flex-row items-center justify-between px-12 gap-6 ${hasTrial ? 'md:col-span-3' : 'md:col-span-2'}`}>
+               <div>
+                  <p className="text-slate-500 text-[10px] font-black uppercase mb-1">Active Tunnels</p>
                   <p className="text-4xl font-black">{myReqs.filter(r => r.status === 'active').length}</p>
                </div>
                {bal >= VPN_PRICE ? (
-                 <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-10 py-5 rounded-3xl font-black text-xs flex items-center gap-4 shadow-2xl shadow-blue-600/40 transition-all uppercase tracking-widest">
+                 <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-10 py-5 rounded-3xl font-black text-xs flex items-center gap-4 shadow-2xl uppercase tracking-widest transition-all">
                     <IconPlus /> Add Instance (₱{VPN_PRICE})
                  </button>
-               ) : <div className="text-right"><span className="text-slate-700 text-[10px] font-black uppercase italic tracking-widest block">Top up required</span><p className="text-[9px] text-red-500/30 uppercase font-black">Need ₱{VPN_PRICE}</p></div>}
+               ) : <div className="text-right text-slate-700 font-black uppercase italic text-[10px]">Insufficient Funds</div>}
             </div>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase tracking-widest font-mono italic">
-                <IconShield /> Remote Instances
-              </h2>
-              {myReqs.filter(r => r.type === 'new').length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 font-black uppercase tracking-widest text-xs italic">Walang aktibong nodes.</div>}
-              {myReqs.filter(r => r.type === 'new').map((req) => {
+              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> Remote Instances</h2>
+              {myReqs.length === 0 && <div className="bg-slate-900/50 border border-dashed border-slate-800 p-24 rounded-[60px] text-center text-slate-700 uppercase italic">No nodes. Use the trial button to start.</div>}
+              {myReqs.filter(r => r.type === 'new' || r.type === 'trial').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
-                const isPendingRenewal = myReqs.some(r => r.type === 'renewal' && r.vpnId === req.id && r.status === 'pending');
                 return (
                   <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12">
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">UID: {req.id.slice(-8)}</span>
-                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">UID: {req.id.slice(-8)} {req.type === 'trial' && <span className="text-indigo-500 ml-2 font-black italic">[ 7-DAY TRIAL ]</span>}</span>
+                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
                         {req.status}
                       </span>
                     </div>
 
-                    <div className="p-12 space-y-12">
+                    <div className="p-12">
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
-                        <div className="space-y-12 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-10">
                            {req.status === 'assigned' && (
-                             <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-emerald-500 transition-all uppercase tracking-widest">DEPLOYMENT FINISHED</button>
+                             <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-emerald-500 transition-all uppercase">DEPLOYMENT FINISHED</button>
                            )}
                            
-                           <div className="space-y-10">
-                              <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">01. Winbox GUI Configuration</h4>
-                                <div className="space-y-6">
-                                  <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
-                                    Gamitin ang Winbox GUI. Sa Winbox GUI, Click ang <strong className="text-white">Interfaces</strong>, Click ang <strong className="text-white">+</strong>, Click ang <strong className="text-white">L2TP Client</strong>, Click ang <strong className="text-white">Dial out tab</strong>.
-                                    <br/><br/>
-                                    E copy paste ng tama ang mga data na eto sa L2TP Client.
-                                  </p>
-                                  <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
-                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black tracking-widest">Server</span> <span className="text-emerald-400 font-black">remote.swifftnet.site</span></div>
-                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
-                                     <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                  <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none italic font-mono">02. Terminal Script</h4>
-                                  <button 
-                                    onClick={() => handleCopy(scriptBase, `script-${req.id}`)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${copiedId === `script-${req.id}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-                                  >
-                                    {copiedId === `script-${req.id}` ? <><IconCheck /> Copied!</> : <><IconCopy /> Copy Script</>}
-                                  </button>
-                                </div>
-                                <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto leading-loose italic">
-                                  <pre className="whitespace-pre-wrap">{scriptBase}</pre>
-                                </div>
-                              </div>
-
-                              <div className="space-y-4">
-                                <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest border-b border-slate-800 pb-3 italic font-mono">03. Remote Access Instructions</h4>
-                                <div className="space-y-6">
-                                  <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
-                                    Pwede mo ng e remote ang iyong router gamit ang Winbox at api or ssh sa desktop o laptop, o Mikrotik app sa cellphone. Gamitin lamang ang address at port na eto:
-                                  </p>
-                                  <div className="bg-blue-600/10 p-8 rounded-[32px] border border-blue-500/20 text-center font-mono text-sm">
-                                    <span className="text-blue-400 font-black">remote.swifftnet.site:</span> <span className="text-white italic">[ your port number na naka assign, please check the ports below ]</span>
-                                  </div>
-                                </div>
-                              </div>
+                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3">
+                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Server</span> <span className="text-emerald-400 font-black italic">remote.swifftnet.site</span></div>
+                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
+                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
                            </div>
 
-                           {req.status === 'active' && (
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">Winbox</p>
-                                 <p className="text-xs font-black text-blue-400 font-mono break-all">PORT: {asgn.winbox}</p>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-slate-800">
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox</p>
+                                 <p className="text-xs font-black text-blue-400 font-mono break-all">{asgn.winbox}</p>
                                </div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">API</p>
-                                 <p className="text-xs font-black text-indigo-400 font-mono break-all">PORT: {asgn.api}</p>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1">API</p>
+                                 <p className="text-xs font-black text-indigo-400 font-mono break-all">{asgn.api}</p>
                                </div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 text-center shadow-inner">
-                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1 leading-none font-mono">SSH</p>
-                                 <p className="text-xs font-black text-emerald-400 font-mono break-all">PORT: {asgn.ssh}</p>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry</p>
+                                 <p className="text-xs font-black text-emerald-400 font-mono break-all">{asgn.expiry}</p>
                                </div>
-                               <div className="col-span-full flex flex-col md:flex-row justify-between items-center bg-slate-950/50 p-10 rounded-[40px] border border-slate-800 gap-8 mt-6">
-                                 <div>
-                                   <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest block mb-1 italic">Renewal Due</span>
-                                   <span className="text-2xl font-black text-white">{asgn.expiry}</span>
-                                 </div>
-                                 {!isPendingRenewal && bal >= VPN_PRICE && (
-                                   <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-5 rounded-full font-black text-xs flex items-center gap-4 shadow-2xl transition-all uppercase tracking-widest font-sans">
-                                     <IconRefresh /> Extend access
-                                   </button>
-                                 )}
-                               </div>
-                             </div>
-                           )}
+                           </div>
                         </div>
                       )}
                     </div>
@@ -409,60 +399,17 @@ export default function App() {
             </div>
 
             <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase tracking-widest font-mono italic"><IconCard /> Fund Account</h2>
-              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl font-sans">
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Fund Account</h2>
+              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
                 <form onSubmit={(e) => { 
                   e.preventDefault(); 
                   submitDeposit(e.target.amount.value, e.target.ref.value); 
                   e.target.reset(); 
                 }} className="space-y-8">
-                  <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center mb-6 border-dashed">
-                      <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest font-mono italic">RECEIVER GCASH</p>
-                      <p className="text-3xl font-black text-blue-500 tracking-tighter leading-none font-mono">0968 385 9759</p>
-                  </div>
-                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight" />
-                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black tracking-tight uppercase font-mono" />
-                  <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm shadow-2xl transition-all uppercase tracking-widest">Confirm Transaction</button>
+                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black" />
+                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-lg font-black uppercase font-mono" />
+                  <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-emerald-500/10">Confirm Transaction</button>
                 </form>
-
-                <div className="space-y-6">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest font-mono">DEPOSIT LOGS</p>
-                  <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar">
-                    {myPays.map(p => (
-                      <div key={p.id} className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 flex justify-between items-center text-[10px]">
-                        <div><span className="text-slate-500 font-black block mb-1 font-mono uppercase tracking-tighter">REF: {p.refNo}</span><span className="text-slate-400 font-black">₱{p.amount} <span className="mx-1 opacity-20">|</span> {p.date}</span></div>
-                        <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>
-                          {p.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/40 p-10 rounded-[50px] border border-slate-800/50 space-y-6 shadow-2xl font-sans animate-in fade-in zoom-in-95 duration-700">
-                <div className="flex items-center gap-4 text-blue-500 mb-2">
-                  <IconCode />
-                  <h2 className="text-[10px] font-black uppercase tracking-[0.2em] font-mono">System Architect</h2>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-2xl font-black tracking-tighter text-white italic">Howard Kingsley Ramos</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Lead Developer & Network Engineer</p>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-slate-800/50">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Platform</span>
-                      <span className="text-[9px] font-black text-blue-400 uppercase font-mono">SwifftNet v3.0</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Region</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase">PH / Cagayan Valley</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -471,12 +418,10 @@ export default function App() {
     );
   }
 
-  // --- Admin Interface ---
+  // Admin Interface
   if (view === 'admin' && user) {
     const clients = getAllClients();
-    const totalRevenue = payments
-      .filter(p => p.status === 'confirmed')
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalRevenue = payments.filter(p => p.status === 'confirmed').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -484,25 +429,16 @@ export default function App() {
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <div>
                <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Admin <span className="text-blue-500">Terminal</span></h1>
-               <div className="flex items-center gap-2 mt-4 bg-emerald-500/5 border border-emerald-500/10 px-6 py-2 rounded-full">
-                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Total Confirmed Revenue:</span>
-                  <span className="text-emerald-400 font-mono font-black italic">₱{totalRevenue}</span>
-               </div>
+               <p className="mt-4 bg-emerald-500/10 text-emerald-500 px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest inline-block border border-emerald-500/10">Revenue: ₱{totalRevenue}</p>
             </div>
-            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-hidden">
-              {[
-                {id: 'payments', label: 'Queue', icon: <IconRefresh />},
-                {id: 'requests', label: 'Requests', icon: <IconPlus />},
-                {id: 'clients', label: 'Clients', icon: <IconGoogle />},
-                {id: 'transactions', label: 'History', icon: <IconList />}
-              ].map(tab => (
-                <button key={tab.id} onClick={() => setAdminTab(tab.id)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-3 ${adminTab === tab.id ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600 hover:text-slate-400'}`}>
-                   {tab.icon} {tab.label}
+            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl">
+              {['payments', 'requests', 'clients', 'transactions'].map(tab => (
+                <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black transition-all uppercase tracking-widest ${adminTab === tab ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-400'}`}>
+                   {tab}
                 </button>
               ))}
-              <button onClick={() => setView('dashboard')} className="px-8 py-4 rounded-[24px] text-[10px] font-black text-emerald-500 uppercase tracking-widest">Back to Dashboard</button>
+              <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase">Dashboard</button>
             </div>
-            <button onClick={handleLogout} className="text-slate-700 hover:text-white font-black text-[10px] uppercase tracking-widest border border-slate-900 px-12 py-4 rounded-full transition-all">Sign Out</button>
           </header>
 
           <div className="animate-in fade-in duration-700">
@@ -521,17 +457,17 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-                {payments.filter(p => p.status === 'pending').length === 0 && (
-                  <div className="col-span-full py-24 border border-dashed border-slate-800 rounded-[60px] text-center text-slate-700 font-black uppercase italic text-xs tracking-[0.2em]">Walang pending na bayad sa queue.</div>
-                )}
               </div>
             )}
 
             {adminTab === 'requests' && (
               <div className="grid md:grid-cols-2 gap-12">
                 {requests.filter(r => r.status === 'pending').map(r => (
-                  <div key={r.id} className="bg-slate-900 p-12 rounded-[60px] border border-slate-800 shadow-2xl space-y-10 animate-in slide-in-from-right-10">
-                    <p className="font-black text-white text-xl border-b border-slate-800 pb-6 uppercase truncate tracking-tight font-mono">{r.email}</p>
+                  <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-10 animate-in slide-in-from-right-10 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
+                    <div className="flex justify-between items-center border-b border-slate-800 pb-6">
+                      <p className="font-black text-white text-lg uppercase truncate tracking-tight font-mono">{r.email}</p>
+                      {r.type === 'trial' && <span className="text-[10px] bg-indigo-600 text-white px-4 py-2 rounded-full font-black uppercase tracking-widest animate-pulse">7-Day Trial</span>}
+                    </div>
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       const fd = new FormData(e.target);
@@ -539,9 +475,9 @@ export default function App() {
                     }} className="space-y-8">
                       <div className="space-y-3">
                          <label className="text-[11px] text-slate-600 font-black uppercase tracking-widest ml-6">Access Period (Days)</label>
-                         <input name="d" type="number" defaultValue="365" required className="w-full bg-slate-950 p-7 rounded-[2.5rem] text-xl font-black outline-none border border-slate-800 focus:border-indigo-500 text-center" />
+                         <input name="d" type="number" defaultValue={r.type === 'trial' ? "7" : "365"} disabled={r.type === 'trial'} required className="w-full bg-slate-950 p-7 rounded-[2.5rem] text-xl font-black outline-none border border-slate-800 focus:border-indigo-500 text-center disabled:opacity-50" />
                       </div>
-                      {r.type === 'new' && (
+                      {r.type !== 'renewal' && (
                         <div className="space-y-8">
                           <div className="grid grid-cols-2 gap-6">
                             <input name="u" placeholder="VPN User" required className="bg-slate-950 p-6 rounded-[2rem] text-sm font-black outline-none border border-slate-800 focus:border-blue-500 w-full" />
@@ -563,72 +499,29 @@ export default function App() {
 
             {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
-                <div className="overflow-x-auto pr-4 font-mono">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-800/80 text-[11px] uppercase font-black text-slate-700 tracking-widest">
-                      <tr>
-                        <th className="p-12">Identity</th>
-                        <th className="p-12 text-center">Net Balance</th>
-                        <th className="p-12">Nodes</th>
+                <table className="w-full text-left font-mono">
+                  <thead className="bg-slate-800/80 text-[11px] uppercase font-black text-slate-700 tracking-widest">
+                    <tr><th className="p-12">Identity</th><th className="p-12 text-center">Balance</th><th className="p-12">Active Nodes</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {clients.map(email => (
+                      <tr key={email} className="hover:bg-slate-800/20 transition-all">
+                        <td className="p-12 font-black text-white italic">{email}</td>
+                        <td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td>
+                        <td className="p-12">
+                          <div className="space-y-4">
+                            {assignments.filter(a => a.clientEmail === email).map((t, i) => (
+                              <div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner">
+                                 <span className="text-blue-500 font-mono text-[11px] font-black">PORT: {t.winbox}</span>
+                                 <span className="text-slate-600 font-mono text-[11px] font-black italic">EXP: {t.expiry}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {clients.map(email => (
-                        <tr key={email} className="hover:bg-slate-800/20 transition-all group">
-                          <td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td>
-                          <td className="p-12 text-center font-black text-emerald-500 tracking-tighter text-2xl">₱{getUserBalance(email)}</td>
-                          <td className="p-12">
-                            <div className="space-y-4">
-                              {assignments.filter(a => a.clientEmail === email).map((t, i) => (
-                                <div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner">
-                                   <span className="text-blue-500 font-mono text-[11px] font-black uppercase tracking-widest">PORT: {t.winbox}</span>
-                                   <span className="text-slate-600 font-mono text-[11px] font-black uppercase tracking-widest italic leading-none">EXP: {t.expiry}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {adminTab === 'transactions' && (
-              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in duration-500">
-                <div className="overflow-x-auto font-mono">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-800/80 text-[11px] uppercase font-black text-slate-700 tracking-widest">
-                      <tr>
-                        <th className="p-10">Date</th>
-                        <th className="p-10">Client Email</th>
-                        <th className="p-10">Reference No</th>
-                        <th className="p-10 text-right">Amount</th>
-                        <th className="p-10 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {[...payments].sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => (
-                        <tr key={p.id} className="hover:bg-slate-800/20 transition-all">
-                          <td className="p-10 text-slate-500 text-[10px] font-bold">{p.date}</td>
-                          <td className="p-10 font-black text-white italic truncate max-w-[200px]">{p.email}</td>
-                          <td className="p-10 text-blue-400 font-black uppercase tracking-tighter">{p.refNo}</td>
-                          <td className="p-10 text-right font-black text-white text-xl">₱{p.amount}</td>
-                          <td className="p-10 text-center">
-                            <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${
-                              p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 
-                              p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
-                              'text-orange-500 border-orange-500/20 bg-orange-500/5'
-                            }`}>
-                              {p.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
