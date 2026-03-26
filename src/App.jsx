@@ -73,6 +73,7 @@ export default function App() {
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
   const [requestService, setRequestService] = useState("winbox");
+  const [vpnProtocol, setVpnProtocol] = useState("l2tp"); 
   const [clientNote, setClientNote] = useState("");
 
   const [payments, setPayments] = useState([]);
@@ -147,7 +148,7 @@ export default function App() {
   const handleLogout = () => signOut(auth);
 
   /**
-   * --- PAYMENT METHODS (FIXED) ---
+   * --- PAYMENT METHODS ---
    */
   const submitDeposit = async (amount, refNo) => {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
@@ -168,18 +169,35 @@ export default function App() {
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE || type === 'renewal') {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-        email: user.email, status: 'pending', type, vpnId, service: requestService, note: clientNote, date: new Date().toLocaleDateString()
+        email: user.email, 
+        status: 'pending', 
+        type, 
+        vpnId, 
+        service: requestService, 
+        protocol: vpnProtocol, 
+        note: clientNote, 
+        date: new Date().toLocaleDateString()
       });
       setClientNote("");
-      sendEmail(ADMIN_EMAIL, "New Node Request", `User: ${user.email}\nService: ${requestService}\nNote: ${clientNote}`);
+      sendEmail(ADMIN_EMAIL, "New Node Request", `User: ${user.email}\nService: ${requestService}\nProtocol: ${vpnProtocol}\nNote: ${clientNote}`);
     }
   };
 
+  // UPDATED: Trial now uses the selected Protocol and Note from the state
   const createTrialRequest = async () => {
     if (requests.some(r => r.email === user.email && r.type === 'trial')) return alert("Trial already used.");
+    
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-      email: user.email, status: 'pending', type: 'trial', service: 'winbox', note: '7-Day Free Trial', date: new Date().toLocaleDateString()
+      email: user.email, 
+      status: 'pending', 
+      type: 'trial', 
+      service: requestService, 
+      protocol: vpnProtocol, 
+      note: clientNote || "Free Trial Request", 
+      date: new Date().toLocaleDateString()
     });
+    setClientNote("");
+    sendEmail(ADMIN_EMAIL, "New TRIAL Request", `User: ${user.email}\nService: ${requestService}\nProtocol: ${vpnProtocol}\nNote: ${clientNote}`);
   };
 
   const adminAssignTunnel = async (reqId, email, data, type) => {
@@ -225,7 +243,6 @@ export default function App() {
     const myReqs = requests.filter(r => r.email === user.email);
     const hasTrialUsed = myReqs.some(r => r.type === 'trial');
     const isAccountNew = (new Date().getTime() - new Date(user.createdAt).getTime()) < (24 * 60 * 60 * 1000); 
-    const scriptBase = `/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 \n/ip service set api,ssh address=192.168.89.0/24`;
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -246,18 +263,35 @@ export default function App() {
               <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
               <p className="text-5xl font-black">₱{bal}</p>
             </div>
+            
+            {/* UPDATED: Trial Box now mentions using selected settings */}
             {!hasTrialUsed && isAccountNew && (
-              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse"><p className="text-[10px] font-black text-indigo-400 uppercase">PROMO</p><button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase">Free Winbox Trial</button></div>
+              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">7-Day Promo</p>
+                <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">
+                  Claim Free Trial
+                </button>
+                <p className="text-[8px] text-indigo-300 font-bold uppercase italic opacity-60">Uses selected protocol/note</p>
+              </div>
             )}
+
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-2' : 'md:col-span-3 shadow-xl'}`}>
-               <div className="flex flex-col md:flex-row gap-4 items-center">
-                  <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full md:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-black uppercase text-blue-400 outline-none">
+               <div className="flex flex-col lg:flex-row gap-4 items-center">
+                  
+                  <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                    <button onClick={() => setVpnProtocol('l2tp')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${vpnProtocol === 'l2tp' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>L2TP</button>
+                    <button onClick={() => setVpnProtocol('sstp')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${vpnProtocol === 'sstp' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>SSTP</button>
+                  </div>
+
+                  <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-black uppercase text-blue-400 outline-none cursor-pointer">
                      <option value="winbox">Winbox GUI</option><option value="api">API Port</option><option value="ssh">SSH Port</option>
                   </select>
-                  <input value={clientNote} onChange={(e)=>setClientNote(e.target.value)} placeholder="Add note (e.g. Branch Name)" className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none focus:border-blue-500 transition-all" />
+                  
+                  <input value={clientNote} onChange={(e)=>setClientNote(e.target.value)} placeholder="Note (e.g. Branch / Home)" className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none focus:border-blue-500 transition-all placeholder:text-slate-700" />
+                  
                   {bal >= VPN_PRICE ? (
                     <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all">Add Node (₱{VPN_PRICE})</button>
-                  ) : <span className="text-red-500 text-[10px] font-black uppercase italic">Top-up Needed</span>}
+                  ) : <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>}
                </div>
             </div>
           </div>
@@ -267,27 +301,39 @@ export default function App() {
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> Remote Instances</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
+                const protocol = req.protocol || 'l2tp'; 
+                
+                const script = protocol === 'l2tp' 
+                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} use-ipsec=yes \n/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 \n/ip service set ${asgn?.service || 'winbox'} address=192.168.89.0/24`
+                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} profile=default-encryption \n/ip firewall filter add action=accept chain=input src-address=192.168.89.0/24 \n/ip service set ${asgn?.service || 'winbox'} address=192.168.89.0/24`;
+
                 return (
                   <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12 animate-in slide-in-from-bottom-2">
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
-                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} <span className="text-blue-500 ml-2">[{req.service || 'winbox'}]</span></span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} <span className="text-blue-500 ml-2">[{req.service || 'winbox'}]</span> <span className="text-emerald-500 ml-2">[{protocol.toUpperCase()}]</span></span>
                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>{req.status}</span>
                     </div>
                     <div className="p-12">
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
                            {req.status === 'assigned' && <button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg uppercase hover:bg-emerald-500 transition-all">DEPLOYMENT FINISHED</button>}
+                           
                            <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Server</span> <span className="text-emerald-400 font-black italic">remote.swifftnet.site</span></div>
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>User</span> <span className="text-white font-black">{asgn.user}</span></div>
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
                            </div>
-                           <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 italic relative group">
-                              <pre className="whitespace-pre-wrap">{scriptBase}</pre>
-                              <button onClick={() => handleCopy(scriptBase, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all text-slate-400">
-                                {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
-                              </button>
+
+                           <div className="space-y-4">
+                             <p className="text-[10px] font-black text-blue-400 uppercase italic">MikroTik Script ({protocol.toUpperCase()}):</p>
+                             <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 italic relative group">
+                                <pre className="whitespace-pre-wrap">{script}</pre>
+                                <button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all text-slate-400">
+                                  {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
+                                </button>
+                             </div>
                            </div>
+
                            <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
                                <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Port ({asgn.service})</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.port}</p></div>
                                <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry</p><p className="text-xs font-black text-emerald-400 font-mono">{asgn.expiry}</p></div>
@@ -361,10 +407,13 @@ export default function App() {
           {adminTab === 'requests' && (
             <div className="grid md:grid-cols-2 gap-12">
               {requests.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-right-10 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
+                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-right-10 ${r.type === 'trial' ? 'border-indigo-500 shadow-indigo-500/20' : 'border-slate-800'}`}>
                   <div className="border-b border-slate-800 pb-6 flex justify-between items-start">
                     <p className="font-black text-white text-lg truncate font-mono uppercase">{r.email}</p>
-                    {r.type === 'trial' && <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest animate-pulse border border-indigo-500/30 px-3 py-1 rounded-full">New Trial</span>}
+                    <div className="flex flex-col items-end gap-2">
+                      {r.type === 'trial' && <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest animate-pulse border border-indigo-500/30 px-3 py-1 rounded-full">New Trial</span>}
+                      <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest border border-blue-500/30 px-3 py-1 rounded-full">{r.protocol || 'L2TP'}</span>
+                    </div>
                   </div>
                   
                   <div className="bg-blue-600/5 border border-blue-500/20 p-6 rounded-3xl">
