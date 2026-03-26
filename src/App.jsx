@@ -115,14 +115,22 @@ export default function App() {
     onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
+  /**
+   * --- CORE UTILITIES ---
+   */
   const getUserBalance = (email) => {
-    const deposits = payments.filter(p => p.email === email && p.status === 'confirmed').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const deposits = payments
+      .filter(p => p.email === email && p.status === 'confirmed')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const spent = requests.filter(r => r.email === email && r.type !== 'trial').length * VPN_PRICE;
     return deposits - spent;
   };
 
   const getAllClients = () => Array.from(new Set([...payments.map(p => p.email), ...requests.map(r => r.email)]));
 
+  /**
+   * --- AUTH METHODS ---
+   */
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setAuthError(null);
@@ -138,6 +146,24 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
+  /**
+   * --- PAYMENT METHODS (FIXED) ---
+   */
+  const submitDeposit = async (amount, refNo) => {
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
+      email: user.email, amount, refNo, status: 'pending', date: new Date().toLocaleDateString()
+    });
+  };
+
+  const updatePaymentStatus = async (id, status, clientEmail) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'payments', id), { status });
+    sendEmail(clientEmail, status === 'confirmed' ? "Payment Confirmed ✅" : "Payment Denied ❌", 
+      status === 'confirmed' ? "Your balance has been updated." : "We could not verify your reference number.");
+  };
+
+  /**
+   * --- REQUEST METHODS ---
+   */
   const createVpnRequest = async (type = 'new', vpnId = null) => {
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE || type === 'renewal') {
@@ -163,7 +189,7 @@ export default function App() {
       requestId: reqId, clientEmail: email, user: data.u, pass: data.p, port: data.port, service: data.service, expiry: exp.toLocaleDateString() 
     });
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
-    sendEmail(email, "SwifftNet: Port Ready!", `Your ${data.service} port ${data.port} is ready.`);
+    sendEmail(email, "SwifftNet: Port Ready! 🚀", `Your ${data.service} port ${data.port} is ready for use.`);
   };
 
   const handleCopy = (text, id) => {
@@ -172,7 +198,7 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET...</div>;
+  if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
 
   if (view === 'landing') {
     return (
@@ -180,14 +206,14 @@ export default function App() {
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <h1 className="text-5xl font-black mb-12 tracking-tighter uppercase italic text-center leading-none">SwifftNet <span className="text-blue-600">Remote</span></h1>
         <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-6">
-          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Register Account' : 'Login'}</h2>
+          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Join SwifftNet' : 'Login'}</h2>
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <input type="email" placeholder="Email" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
             <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
-            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
+            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
           </form>
-          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest transition-all"><IconGoogle /> Google Login</button>
-          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Return to Login' : 'Create New Account'}</button>
+          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
+          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Switch to Login' : 'Create New Account'}</button>
           {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{authError}</p>}
         </div>
       </div>
@@ -203,8 +229,8 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
-        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
-          <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6">
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6 shadow-xl">
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl uppercase border-4 border-blue-600">{user.name[0]}</div>
               <div><h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1><p className="text-xs text-slate-500 font-bold uppercase mt-2">{user.email}</p></div>
@@ -216,14 +242,14 @@ export default function App() {
           </header>
 
           <div className="grid md:grid-cols-4 gap-8">
-            <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl flex flex-col justify-center">
+            <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
               <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
               <p className="text-5xl font-black">₱{bal}</p>
             </div>
             {!hasTrialUsed && isAccountNew && (
-              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse"><p className="text-[10px] font-black text-indigo-400 uppercase">PROMO</p><button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-xl">Free Winbox Trial</button></div>
+              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse"><p className="text-[10px] font-black text-indigo-400 uppercase">PROMO</p><button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase">Free Winbox Trial</button></div>
             )}
-            <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-2' : 'md:col-span-3'}`}>
+            <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-2' : 'md:col-span-3 shadow-xl'}`}>
                <div className="flex flex-col md:flex-row gap-4 items-center">
                   <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full md:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-black uppercase text-blue-400 outline-none">
                      <option value="winbox">Winbox GUI</option><option value="api">API Port</option><option value="ssh">SSH Port</option>
@@ -231,7 +257,7 @@ export default function App() {
                   <input value={clientNote} onChange={(e)=>setClientNote(e.target.value)} placeholder="Add note (e.g. Branch Name)" className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none focus:border-blue-500 transition-all" />
                   {bal >= VPN_PRICE ? (
                     <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all">Add Node (₱{VPN_PRICE})</button>
-                  ) : <span className="text-red-500 text-[10px] font-black uppercase italic">Insufficient Balance</span>}
+                  ) : <span className="text-red-500 text-[10px] font-black uppercase italic">Top-up Needed</span>}
                </div>
             </div>
           </div>
@@ -242,27 +268,29 @@ export default function App() {
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 return (
-                  <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12">
+                  <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12 animate-in slide-in-from-bottom-2">
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
                       <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} <span className="text-blue-500 ml-2">[{req.service || 'winbox'}]</span></span>
                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>{req.status}</span>
                     </div>
                     <div className="p-12">
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
-                        <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="space-y-10">
                            {req.status === 'assigned' && <button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg uppercase hover:bg-emerald-500 transition-all">DEPLOYMENT FINISHED</button>}
-                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3">
+                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Server</span> <span className="text-emerald-400 font-black italic">remote.swifftnet.site</span></div>
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>User</span> <span className="text-white font-black">{asgn.user}</span></div>
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
                            </div>
                            <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 italic relative group">
                               <pre className="whitespace-pre-wrap">{scriptBase}</pre>
-                              <button onClick={() => handleCopy(scriptBase, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all">{copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}</button>
+                              <button onClick={() => handleCopy(scriptBase, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all text-slate-400">
+                                {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
+                              </button>
                            </div>
                            <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Assigned Port ({asgn.service})</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.port}</p></div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry Date</p><p className="text-xs font-black text-emerald-400 font-mono">{asgn.expiry}</p></div>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Port ({asgn.service})</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.port}</p></div>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry</p><p className="text-xs font-black text-emerald-400 font-mono">{asgn.expiry}</p></div>
                            </div>
                         </div>
                       )}
@@ -276,7 +304,7 @@ export default function App() {
               <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
                 <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center border-dashed">
-                  <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH RECEIVER</p>
+                  <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH</p>
                   <p className="text-3xl font-black text-blue-500 font-mono tracking-tighter">0968 385 9759</p>
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-8">
@@ -288,7 +316,7 @@ export default function App() {
                     {payments.filter(p => p.email === user.email).map(p => (
                       <div key={p.id} className="bg-slate-950 p-5 rounded-[20px] border border-slate-800 flex justify-between items-center text-[10px]">
                         <div><span className="text-slate-500 font-black block mb-1">REF: {p.refNo}</span><span>₱{p.amount} | {p.date}</span></div>
-                        <span className={`font-black uppercase px-3 py-1 rounded-full border ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20' : 'text-orange-500 border-orange-500/20'}`}>{p.status}</span>
+                        <span className={`font-black uppercase px-3 py-1 rounded-full border ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>{p.status}</span>
                       </div>
                     ))}
                 </div>
@@ -306,7 +334,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto space-y-16 animate-in fade-in duration-700">
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
-            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800">
+            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl">
               {['payments', 'requests', 'clients', 'transactions'].map(tab => (
                 <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
@@ -319,13 +347,14 @@ export default function App() {
               {payments.filter(p => p.status === 'pending').map(p => (
                 <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95">
                   <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
-                  <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black font-mono tracking-widest">REF: {p.refNo}</p></div>
+                  <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
                   <div className="flex gap-4">
-                    <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-500 transition-all">APPROVE</button>
-                    <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase hover:bg-red-600/30 transition-all">DENY</button>
+                    <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-500">APPROVE</button>
+                    <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
                   </div>
                 </div>
               ))}
+              {payments.filter(p => p.status === 'pending').length === 0 && <div className="col-span-full py-24 text-center border border-dashed border-slate-900 rounded-[60px] text-slate-800 font-black uppercase tracking-widest italic text-xs">No pending payments</div>}
             </div>
           )}
 
@@ -334,48 +363,38 @@ export default function App() {
               {requests.filter(r => r.status === 'pending').map(r => (
                 <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-right-10 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
                   <div className="border-b border-slate-800 pb-6 flex justify-between items-start">
-                    <div>
-                        <p className="font-black text-white text-lg truncate font-mono uppercase">{r.email}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Request Date: {r.date}</p>
-                    </div>
-                    {r.type === 'trial' && <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest animate-pulse px-4 py-2 border border-indigo-500/30 rounded-full">New Trial Request</span>}
+                    <p className="font-black text-white text-lg truncate font-mono uppercase">{r.email}</p>
+                    {r.type === 'trial' && <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest animate-pulse border border-indigo-500/30 px-3 py-1 rounded-full">New Trial</span>}
                   </div>
                   
-                  {/* CLIENT NOTE DISPLAYED HERE */}
                   <div className="bg-blue-600/5 border border-blue-500/20 p-6 rounded-3xl">
                      <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2">Message from Client:</p>
-                     <p className="text-sm font-medium italic text-slate-300 leading-relaxed">"{r.note || 'No note provided'}"</p>
+                     <p className="text-sm font-medium italic text-slate-300">"{r.note || 'No note provided'}"</p>
                   </div>
 
                   <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
                     <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
-                        <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Requested Service Type</p>
-                        <p className="text-xl font-black text-blue-500 uppercase tracking-widest">{r.service || 'winbox'}</p>
+                        <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Requested Service</p>
+                        <p className="text-xl font-black text-blue-500 uppercase">{r.service || 'winbox'}</p>
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-700 uppercase ml-4">Access Days</label>
-                        <input name="d" type="number" defaultValue={r.type === 'trial' ? "7" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none disabled:opacity-40" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none border border-slate-800 focus:border-blue-600" />
-                        <input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none border border-slate-800 focus:border-blue-600" />
-                    </div>
+                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "7" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
+                    <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
                     <input name="port" placeholder="Assign Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
-                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all shadow-blue-600/20">Authorize Port Assignment</button>
+                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
                   </form>
                 </div>
               ))}
-              {requests.filter(r => r.status === 'pending').length === 0 && <div className="col-span-full py-24 text-center text-slate-800 font-black uppercase tracking-widest italic text-xs border border-dashed border-slate-900 rounded-[60px]">No pending requests in queue</div>}
+              {requests.filter(r => r.status === 'pending').length === 0 && <div className="col-span-full py-24 text-center border border-dashed border-slate-900 rounded-[60px] text-slate-800 font-black uppercase tracking-widest italic text-xs">No pending requests</div>}
             </div>
           )}
 
           {adminTab === 'clients' && (
-              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in">
+              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <table className="w-full text-left font-mono">
-                  <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Identity</th><th className="p-12 text-center">Net Balance</th><th className="p-12">Assigned Nodes</th></tr></thead>
+                  <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Net Balance</th><th className="p-12">Active Nodes</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">
                     {getAllClients().map(email => (
-                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between gap-10 border-dashed shadow-inner"><span className="text-blue-500 font-mono text-[11px] font-black uppercase">{t.service || 'winbox'}: {t.port}</span><span className="text-slate-600 font-mono text-[11px] font-black italic">EXP: {t.expiry}</span></div>))}</div></td></tr>
+                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between gap-10 border-dashed"><span className="text-blue-500 font-mono text-[11px] font-black">{t.service || 'winbox'}: {t.port}</span><span className="text-slate-600 font-mono text-[11px] font-black italic">EXP: {t.expiry}</span></div>))}</div></td></tr>
                     ))}
                   </tbody>
                 </table>
