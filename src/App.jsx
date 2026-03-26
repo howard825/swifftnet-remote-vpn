@@ -22,7 +22,7 @@ import {
 /**
  * --- BUSINESS CONFIGURATION ---
  */
-const VPN_PRICE = 250;
+const VPN_PRICE = 180;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
 
@@ -74,6 +74,7 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
+  const [requestService, setRequestService] = useState("winbox");
 
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -164,19 +165,23 @@ export default function App() {
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE || type === 'renewal') {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-        email: user.email, status: 'pending', type, vpnId, date: new Date().toLocaleDateString()
+        email: user.email, status: 'pending', type, vpnId, 
+        service: requestService,
+        date: new Date().toLocaleDateString()
       });
-      sendEmail(ADMIN_EMAIL, "Request Queue", `Client ${user.email} node request.`);
+      sendEmail(ADMIN_EMAIL, "New Request", `Client ${user.email} node request for ${requestService}.`);
     }
   };
 
   const createTrialRequest = async () => {
     const alreadyTrialed = requests.some(r => r.email === user.email && r.type === 'trial');
-    if (alreadyTrialed) return alert("Trial already used.");
+    if (alreadyTrialed) return alert("System record: Trial already used for this account.");
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-      email: user.email, status: 'pending', type: 'trial', date: new Date().toLocaleDateString()
+      email: user.email, status: 'pending', type: 'trial', 
+      service: 'winbox',
+      date: new Date().toLocaleDateString()
     });
-    sendEmail(ADMIN_EMAIL, "Trial Request", `User ${user.email} requested trial.`);
+    sendEmail(ADMIN_EMAIL, "Trial Alert", `New trial requested by ${user.email}.`);
   };
 
   const adminAssignTunnel = async (reqId, email, data, type) => {
@@ -185,27 +190,21 @@ export default function App() {
       if (target) {
         const curExp = new Date(target.expiry);
         const newExp = new Date(curExp.getTime() + (Number(data.days) * 24 * 60 * 60 * 1000));
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', target.id), {
-          expiry: newExp.toLocaleDateString()
-        });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', target.id), { expiry: newExp.toLocaleDateString() });
       }
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'active' });
     } else {
       const exp = new Date();
-      const days = type === 'trial' ? 7 : Number(data.days);
-      exp.setDate(exp.getDate() + days);
-
+      exp.setDate(exp.getDate() + (type === 'trial' ? 7 : Number(data.days)));
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assignments'), {
         requestId: reqId, clientEmail: email, user: data.u, pass: data.p,
-        winbox: data.wp, api: data.ap, ssh: data.ssh, expiry: exp.toLocaleDateString(),
-        isTrial: type === 'trial'
+        port: data.port, service: data.service, 
+        expiry: exp.toLocaleDateString(), isTrial: type === 'trial'
       });
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
-
-      // NEW: Send email notification for both Trial and Regular
-      const subj = type === 'trial' ? "7-Day Trial Instance Ready! 🚀" : "SwifftNet Instance Authorized! 🚀";
-      const body = `Good news! Your MikroTik Remote Instance has been authorized. 
-      Login to your SwifftNet dashboard at vpn.swifftnet.site to view your credentials and script instructions.`;
+      
+      const subj = type === 'trial' ? "7-Day Trial Ready! 🚀" : "Instance Authorized! 🚀";
+      const body = `Your ${data.service} port has been authorized. Login to vpn.swifftnet.site to view credentials.`;
       sendEmail(email, subj, body);
     }
   };
@@ -228,19 +227,19 @@ export default function App() {
         <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <h1 className="text-5xl font-black mb-12 tracking-tighter uppercase italic text-center">SwifftNet <span className="text-blue-600">Remote</span></h1>
         <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-6">
-          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'New Account' : 'Welcome'}</h2>
+          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Create Account' : 'Welcome'}</h2>
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <input type="email" placeholder="Email" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
             <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
-            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest">
+            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-xl">
               {isSignUp ? 'Register' : 'Login'}
             </button>
           </form>
-          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
-          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline">
-            {isSignUp ? 'Switch to Login' : 'Create New Account'}
+          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest transition-all"><IconGoogle /> Google Login</button>
+          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">
+            {isSignUp ? 'Return to Login' : 'Register Account'}
           </button>
-          {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl">{authError}</p>}
+          {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{authError}</p>}
         </div>
       </div>
     );
@@ -262,8 +261,8 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
-        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-500">
-          <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6">
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 shadow-xl gap-6">
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl uppercase border-4 border-blue-600 shadow-lg">{user.name[0]}</div>
               <div><h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1><p className="text-xs text-slate-500 font-bold uppercase mt-2">{user.email}</p></div>
@@ -276,41 +275,48 @@ export default function App() {
 
           <div className="grid md:grid-cols-4 gap-8">
             <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
-              <p className="text-blue-400 text-[10px] font-black uppercase mb-2">Balance</p>
+              <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
               <p className="text-5xl font-black tracking-tighter">₱{bal}</p>
             </div>
             {!hasTrialUsed && isAccountNew && (
-              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
-                <p className="text-[10px] font-black text-indigo-400 uppercase">NEW USER PROMO</p>
-                <button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase hover:bg-indigo-500">Get 7-Day Trial</button>
+              <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse shadow-xl">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">TRIAL PROMO</p>
+                <button onClick={createTrialRequest} className="bg-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase hover:bg-indigo-500">Free Winbox Node</button>
               </div>
             )}
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col md:flex-row items-center justify-between px-12 gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-2' : 'md:col-span-3'}`}>
-               <div><p className="text-slate-500 text-[10px] font-black uppercase mb-1">Active Tunnels</p><p className="text-4xl font-black">{myReqs.filter(r => r.status === 'active').length}</p></div>
+               <div className="space-y-4">
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Add New Node</p>
+                  <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-xs font-black uppercase text-blue-400 outline-none">
+                     <option value="winbox">Winbox Port</option>
+                     <option value="api">API Port</option>
+                     <option value="ssh">SSH Port</option>
+                  </select>
+               </div>
                {bal >= VPN_PRICE ? (
-                 <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-10 py-5 rounded-3xl font-black text-xs flex items-center gap-4 uppercase transition-all shadow-2xl"><IconPlus /> Add Node (₱{VPN_PRICE})</button>
-               ) : <div className="text-right text-slate-700 font-black uppercase italic text-[10px]">Add funds to create nodes</div>}
+                 <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-10 py-5 rounded-3xl font-black text-xs flex items-center gap-4 uppercase transition-all shadow-2xl"><IconPlus /> Request Port (₱{VPN_PRICE})</button>
+               ) : <div className="text-right text-slate-700 font-black uppercase italic text-[10px]">Deposit required</div>}
             </div>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> Remote Instances</h2>
+              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> My Active Tunnels</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 return (
                   <div key={req.id} className="bg-slate-900 rounded-[50px] border border-slate-800 overflow-hidden shadow-2xl mb-12">
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
-                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} {req.type === 'trial' && <span className="text-indigo-500 font-black ml-2">[7-DAY TRIAL]</span>}</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} <span className="text-blue-500 ml-2">[{req.service || 'winbox'}]</span></span>
                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>{req.status}</span>
                     </div>
                     <div className="p-12">
                       {(req.status === 'assigned' || req.status === 'active') && asgn && (
-                        <div className="space-y-10">
-                           {req.status === 'assigned' && <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl uppercase shadow-lg">DEPLOYMENT FINISHED</button>}
+                        <div className="space-y-10 animate-in fade-in duration-500">
+                           {req.status === 'assigned' && <button onClick={() => finalizeVpnStatus(req.id)} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl uppercase shadow-lg hover:bg-emerald-500 transition-all">DEPLOYMENT FINISHED</button>}
                            
-                           {/* RESTORED INSTRUCTIONS FOR BOTH TRIAL AND PAID */}
-                           <div className="space-y-8 animate-in fade-in slide-in-from-top-2">
+                           {/* INSTRUCTIONS DISPLAYED FOR EVERYONE */}
+                           <div className="space-y-8">
                              <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm leading-relaxed text-slate-400 space-y-3 shadow-inner">
                                <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">Server</span> <span className="text-emerald-400 font-black italic">remote.swifftnet.site</span></div>
                                <div className="flex justify-between py-1 border-b border-slate-800/50"><span className="text-slate-600 uppercase text-[9px] font-black">User</span> <span className="text-white font-black">{asgn.user}</span></div>
@@ -319,9 +325,9 @@ export default function App() {
 
                              <div className="space-y-4">
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic font-mono">01. Terminal Script</h4>
-                                  <button onClick={() => handleCopy(scriptBase, `script-${req.id}`)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${copiedId === `script-${req.id}` ? 'bg-emerald-500' : 'bg-slate-800 text-slate-400'}`}>
-                                    {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />} {copiedId === `script-${req.id}` ? 'Copied' : 'Copy'}
+                                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic font-mono">Terminal Script</h4>
+                                  <button onClick={() => handleCopy(scriptBase, `script-${req.id}`)} className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all text-slate-400">
+                                    {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
                                   </button>
                                 </div>
                                 <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 overflow-x-auto italic">
@@ -329,11 +335,16 @@ export default function App() {
                                 </div>
                              </div>
 
-                             <div className="grid grid-cols-3 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase">Winbox</p><p className="text-xs font-black text-blue-400 font-mono">{asgn.winbox}</p></div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase">API</p><p className="text-xs font-black text-indigo-400 font-mono">{asgn.api}</p></div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase">Expiry</p><p className="text-xs font-black text-emerald-400 font-mono">{asgn.expiry}</p></div>
-                             </div>
+                             <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Assigned Port ({asgn.service})</p>
+                                 <p className="text-2xl font-black text-blue-400 font-mono italic">{asgn.port}</p>
+                               </div>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800">
+                                 <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry</p>
+                                 <p className="text-xs font-black text-emerald-400 font-mono">{asgn.expiry}</p>
+                               </div>
+                           </div>
                            </div>
                         </div>
                       )}
@@ -344,10 +355,10 @@ export default function App() {
             </div>
 
             <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Payments</h2>
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
                 <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center border-dashed">
-                  <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase">GCASH RECEIVER</p>
+                  <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH RECEIVER</p>
                   <p className="text-3xl font-black text-blue-500 tracking-tighter leading-none font-mono">0968 385 9759</p>
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-8">
@@ -356,12 +367,12 @@ export default function App() {
                   <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black text-sm uppercase shadow-2xl transition-all">Confirm Deposit</button>
                 </form>
                 <div className="space-y-6 pt-10 border-t border-slate-800">
-                  <p className="text-[10px] font-black text-slate-600 uppercase font-mono">LOGS</p>
+                  <p className="text-[10px] font-black text-slate-600 uppercase font-mono">MY LOGS</p>
                   <div className="max-h-80 overflow-y-auto space-y-4 pr-3 custom-scrollbar">
                     {myPays.map(p => (
                       <div key={p.id} className="bg-slate-950 p-6 rounded-[24px] border border-slate-800 flex justify-between items-center text-[10px]">
                         <div><span className="text-slate-500 font-black block mb-1 font-mono">REF: {p.refNo}</span><span>₱{p.amount} | {p.date}</span></div>
-                        <span className={`font-black uppercase px-4 py-1.5 rounded-full border ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20' : 'text-orange-500 border-orange-500/20'}`}>{p.status}</span>
+                        <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20' : 'text-orange-500 border-orange-500/20'}`}>{p.status}</span>
                       </div>
                     ))}
                   </div>
@@ -398,7 +409,7 @@ export default function App() {
                     <p className="font-black text-blue-400 text-sm font-mono italic truncate">{p.email}</p>
                     <div className="bg-black/40 p-10 rounded-[40px] text-center border border-slate-800"><p className="text-5xl font-black mb-2">₱{p.amount}</p><p className="text-[11px] text-slate-600 font-black font-mono">REF: {p.refNo}</p></div>
                     <div className="flex gap-4">
-                      <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-6 rounded-3xl text-[10px] font-black uppercase">APPROVE</button>
+                      <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-6 rounded-3xl text-[10px] font-black uppercase hover:bg-emerald-500">APPROVE</button>
                       <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-6 rounded-3xl text-[10px] font-black uppercase">DENY</button>
                     </div>
                   </div>
@@ -406,7 +417,7 @@ export default function App() {
               </div>
             )}
             {adminTab === 'transactions' && (
-              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
+              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in">
                 <table className="w-full text-left font-mono">
                   <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest">
                     <tr><th className="p-10">Date</th><th className="p-10">Client</th><th className="p-10 text-right">Amount</th><th className="p-10 text-center">Status</th></tr>
@@ -427,14 +438,14 @@ export default function App() {
             {adminTab === 'requests' && (
               <div className="grid md:grid-cols-2 gap-12">
                 {requests.filter(r => r.status === 'pending').map(r => (
-                  <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-10 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
-                    <div className="flex justify-between items-center border-b border-slate-800 pb-6"><p className="font-black text-white text-lg uppercase truncate font-mono">{r.email}</p>{r.type === 'trial' && <span className="text-[10px] bg-indigo-600 text-white px-4 py-2 rounded-full font-black animate-pulse">7-Day Trial</span>}</div>
-                    <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), wp: fd.get('wp'), ap: fd.get('ap'), ssh: fd.get('ssh') }, r.type); }} className="space-y-8">
-                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "7" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-6 rounded-3xl text-center font-black border border-slate-800" />
-                      <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-3xl font-black w-full" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-3xl font-black w-full" /></div>
-                      <div className="grid grid-cols-2 gap-4"><input name="wp" placeholder="Winbox Port" required className="bg-slate-950 p-5 rounded-3xl font-black w-full" /><input name="ssh" placeholder="SSH Port" required className="bg-slate-950 p-5 rounded-3xl font-black w-full" /></div>
-                      <input name="ap" placeholder="API Port" required className="bg-slate-950 p-5 rounded-3xl font-black w-full" />
-                      <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl">Authorize</button>
+                  <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-10 animate-in slide-in-from-right-10 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
+                    <div className="flex justify-between items-center border-b border-slate-800 pb-6"><p className="font-black text-white text-lg uppercase truncate font-mono">{r.email}</p>{r.type === 'trial' && <span className="text-[10px] bg-indigo-600 text-white px-4 py-2 rounded-full font-black animate-pulse uppercase">Trial</span>}</div>
+                    <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-8">
+                      <div className="bg-slate-950 p-6 rounded-3xl text-center border border-slate-800"><p className="text-[10px] text-slate-600 uppercase font-black">Requested Port Type</p><p className="text-xl font-black text-blue-500 uppercase">{r.service || 'winbox'}</p></div>
+                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "7" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-6 rounded-3xl text-center font-black border border-slate-800 outline-none" />
+                      <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-3xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-3xl font-black w-full outline-none" /></div>
+                      <input name="port" placeholder="Assign Port Number" required className="bg-slate-950 p-5 rounded-3xl font-black w-full text-center text-xl text-blue-400 outline-none" />
+                      <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Port</button>
                     </form>
                   </div>
                 ))}
@@ -446,7 +457,7 @@ export default function App() {
                   <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Balance</th><th className="p-12">Active Nodes</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">
                     {clients.map(email => (
-                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner"><span className="text-blue-500 font-mono text-[11px] font-black uppercase">PORT: {t.winbox}</span><span className="text-slate-600 font-mono text-[11px] font-black uppercase italic">EXP: {t.expiry}</span></div>))}</div></td></tr>
+                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between gap-12 border-dashed shadow-inner"><span className="text-blue-500 font-mono text-[11px] font-black uppercase">{t.service || 'winbox'}: {t.port}</span><span className="text-slate-600 font-mono text-[11px] font-black uppercase italic">EXP: {t.expiry}</span></div>))}</div></td></tr>
                     ))}
                   </tbody>
                 </table>
