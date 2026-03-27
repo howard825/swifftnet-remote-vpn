@@ -309,8 +309,12 @@ export default function App() {
 
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
                <div className="flex flex-col lg:flex-row gap-4 items-center">
-                  <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-black uppercase text-blue-400 outline-none cursor-pointer">
+                  <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
                      <option value="winbox">Winbox</option><option value="api">API</option><option value="ssh">SSH</option>
+                  </select>
+                  {/* NEW PROTOCOL SELECTOR */}
+                  <select value={vpnProtocol} onChange={(e)=>setVpnProtocol(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-emerald-400 outline-none cursor-pointer">
+                     <option value="l2tp">L2TP</option><option value="sstp">SSTP</option>
                   </select>
                   <input value={clientNote} onChange={(e)=>setClientNote(e.target.value)} placeholder="Note..." className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none" />
                   {bal >= VPN_PRICE ? (
@@ -468,6 +472,8 @@ export default function App() {
                     </div>
                     <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
                       <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
+                          {/* SHOW PROTOCOL TO ADMIN */}
+                          <p className="text-[10px] text-blue-500 font-black uppercase mb-1">Protocol: {r.protocol || 'l2tp'}</p>
                           <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Service: {r.service || 'winbox'}</p>
                           <p className="text-sm italic">Note: {r.note || 'N/A'}</p>
                       </div>
