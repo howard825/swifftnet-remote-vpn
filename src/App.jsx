@@ -16,7 +16,8 @@ import {
   addDoc, 
   onSnapshot, 
   updateDoc, 
-  doc 
+  doc,
+  deleteDoc
 } from 'firebase/firestore';
 
 /**
@@ -218,7 +219,6 @@ export default function App() {
 
   const adminAssignTunnel = async (reqId, email, data, type) => {
     const exp = new Date();
-    // CHANGED: Trial is now 1 day instead of 7
     const duration = type === 'trial' ? 1 : Number(data.days);
     exp.setDate(exp.getDate() + duration);
 
@@ -229,7 +229,7 @@ export default function App() {
       pass: data.p, 
       port: data.port, 
       service: data.service, 
-      expiry: exp.toISOString() // Store as ISO for easier comparison
+      expiry: exp.toISOString() 
     });
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
     sendEmail(email, "SwifftNet: Port Ready! 🚀", `Your port ${data.port} is ready.`);
@@ -326,10 +326,7 @@ export default function App() {
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const protocol = req.protocol || 'l2tp'; 
-                
-                // EXPIRY CHECK LOGIC
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
-
                 const script = protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} use-ipsec=yes`
                   : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} profile=default-encryption`;
@@ -415,64 +412,113 @@ export default function App() {
         <div className="max-w-7xl mx-auto space-y-16 animate-in fade-in duration-700">
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
-            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl">
+            <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-x-auto">
               {['payments', 'requests', 'clients', 'transactions'].map(tab => (
-                <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
+                <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
-              <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase">Dashboard</button>
+              <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard</button>
             </div>
           </header>
 
+          {/* PAYMENTS TAB (PENDING) */}
           {adminTab === 'payments' && (
             <div className="grid md:grid-cols-3 gap-10">
-              {payments.filter(p => p.status === 'pending').map(p => (
-                <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8">
-                  <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
-                  <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
-                  <div className="flex gap-4">
-                    <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button>
-                    <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
+              {payments.filter(p => p.status === 'pending').length > 0 ? (
+                payments.filter(p => p.status === 'pending').map(p => (
+                  <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95">
+                    <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
+                    <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
+                    <div className="flex gap-4">
+                      <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button>
+                      <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="col-span-3 text-center py-24 text-slate-800 font-black uppercase tracking-widest italic text-xl border-4 border-dashed border-slate-900 rounded-[60px]">System Clear: No Pending Payments</div>
+              )}
             </div>
           )}
 
+          {/* REQUESTS TAB */}
           {adminTab === 'requests' && (
             <div className="grid md:grid-cols-2 gap-12">
-              {requests.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 ${r.type === 'trial' ? 'border-indigo-500 shadow-indigo-500/20' : 'border-slate-800'}`}>
-                  <div className="border-b border-slate-800 pb-6 flex justify-between items-start">
-                    <p className="font-black text-white text-lg truncate uppercase">{r.email}</p>
-                    <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest border border-blue-500/30 px-3 py-1 rounded-full">{r.type.toUpperCase()}</span>
-                  </div>
-                  
-                  <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
-                    <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
-                        <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Service: {r.service || 'winbox'}</p>
-                        <p className="text-sm italic">Note: {r.note || 'N/A'}</p>
+              {requests.filter(r => r.status === 'pending').length > 0 ? (
+                requests.filter(r => r.status === 'pending').map(r => (
+                  <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 ${r.type === 'trial' ? 'border-indigo-500 shadow-indigo-500/20' : 'border-slate-800'}`}>
+                    <div className="border-b border-slate-800 pb-6 flex justify-between items-start">
+                      <p className="font-black text-white text-lg truncate uppercase">{r.email}</p>
+                      <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest border border-blue-500/30 px-3 py-1 rounded-full">{r.type.toUpperCase()}</span>
                     </div>
-                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
-                    <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
-                    <input name="port" placeholder="Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
-                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
-                  </form>
-                </div>
-              ))}
+                    <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
+                      <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
+                          <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Service: {r.service || 'winbox'}</p>
+                          <p className="text-sm italic">Note: {r.note || 'N/A'}</p>
+                      </div>
+                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
+                      <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
+                      <input name="port" placeholder="Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
+                      <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
+                    </form>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-24 text-slate-800 font-black uppercase tracking-widest italic text-xl border-4 border-dashed border-slate-900 rounded-[60px]">All Provisioning Requests Complete</div>
+              )}
             </div>
           )}
 
+          {/* CLIENTS TAB */}
           {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <table className="w-full text-left font-mono">
                   <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Net Balance</th><th className="p-12">Active Nodes</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">
                     {getAllClients().map(email => (
-                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between gap-10 border-dashed"><span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span><span className="text-slate-600 font-mono text-[11px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span></div>))}</div></td></tr>
+                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 border-dashed relative group"><span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span><span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span><button onClick={async() => { if(confirm("Terminate this port?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button></div>))}</div></td></tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+          )}
+
+          {/* TRANSACTIONS TAB */}
+          {adminTab === 'transactions' && (
+            <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+              <table className="w-full text-left font-mono">
+                <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest">
+                  <tr>
+                    <th className="p-12">Client</th>
+                    <th className="p-12">Amount</th>
+                    <th className="p-12">Ref No</th>
+                    <th className="p-12">Date</th>
+                    <th className="p-12 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {[...payments].reverse().map(p => (
+                    <tr key={p.id} className="hover:bg-slate-800/20 transition-all">
+                      <td className="p-12 font-black text-white italic truncate max-w-[200px]">{p.email}</td>
+                      <td className="p-12 font-black text-emerald-500">₱{p.amount}</td>
+                      <td className="p-12 text-slate-400">{p.refNo}</td>
+                      <td className="p-12 text-slate-400">{p.date}</td>
+                      <td className="p-12 text-center">
+                        <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] tracking-widest ${
+                          p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 
+                          p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
+                          'text-orange-500 border-orange-500/20 bg-orange-500/5'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {payments.length === 0 && (
+                <div className="p-20 text-center text-slate-600 font-black uppercase tracking-widest italic">No transaction logs found in core.</div>
+              )}
+            </div>
           )}
         </div>
       </div>
