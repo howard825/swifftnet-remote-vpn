@@ -322,7 +322,24 @@ export default function App() {
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> Remote Instances</h2>
+              
+              {/* CORE DEVELOPER PROFILE SECTION */}
+              <div className="bg-slate-900/40 p-8 rounded-[40px] border border-blue-500/20 flex flex-col md:flex-row items-center gap-8 shadow-2xl animate-in fade-in duration-1000">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-3xl font-black shadow-lg border border-white/10">HK</div>
+                  <div className="absolute -bottom-2 -right-2 bg-emerald-500 w-6 h-6 rounded-full border-4 border-slate-950" title="System Online"></div>
+                </div>
+                <div className="text-center md:text-left space-y-2">
+                  <h3 className="text-2xl font-black uppercase italic tracking-tighter">Howard Kingsley Ramos</h3>
+                  <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">System Architect & Network Engineer</p>
+                  <div className="flex items-center justify-center md:justify-start gap-2 text-slate-500 text-[11px] font-bold">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Santa Ana, Cagayan Valley, Philippines
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const protocol = req.protocol || 'l2tp'; 
@@ -420,7 +437,7 @@ export default function App() {
             </div>
           </header>
 
-          {/* PAYMENTS TAB (PENDING) */}
+          {/* ADMIN TABS: PAYMENTS, REQUESTS, CLIENTS, TRANSACTIONS */}
           {adminTab === 'payments' && (
             <div className="grid md:grid-cols-3 gap-10">
               {payments.filter(p => p.status === 'pending').length > 0 ? (
@@ -440,7 +457,6 @@ export default function App() {
             </div>
           )}
 
-          {/* REQUESTS TAB */}
           {adminTab === 'requests' && (
             <div className="grid md:grid-cols-2 gap-12">
               {requests.filter(r => r.status === 'pending').length > 0 ? (
@@ -468,31 +484,39 @@ export default function App() {
             </div>
           )}
 
-          {/* CLIENTS TAB */}
           {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <table className="w-full text-left font-mono">
                   <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Net Balance</th><th className="p-12">Active Nodes</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">
                     {getAllClients().map(email => (
-                      <tr key={email} className="hover:bg-slate-800/20 transition-all"><td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td><td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td><td className="p-12"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 border-dashed relative group"><span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span><span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span><button onClick={async() => { if(confirm("Terminate this port?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button></div>))}</div></td></tr>
+                      <tr key={email} className="hover:bg-slate-800/20 transition-all">
+                        <td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td>
+                        <td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td>
+                        <td className="p-12">
+                          <div className="space-y-4">
+                            {assignments.filter(a => a.clientEmail === email).map((t, i) => (
+                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 border-dashed relative group">
+                                <span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span>
+                                <span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span>
+                                <button onClick={async() => { if(window.confirm("Terminate this port?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
           )}
 
-          {/* TRANSACTIONS TAB */}
           {adminTab === 'transactions' && (
             <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4">
               <table className="w-full text-left font-mono">
                 <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest">
                   <tr>
-                    <th className="p-12">Client</th>
-                    <th className="p-12">Amount</th>
-                    <th className="p-12">Ref No</th>
-                    <th className="p-12">Date</th>
-                    <th className="p-12 text-center">Status</th>
+                    <th className="p-12">Client</th><th className="p-12">Amount</th><th className="p-12">Ref No</th><th className="p-12">Date</th><th className="p-12 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
@@ -507,9 +531,7 @@ export default function App() {
                           p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 
                           p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
                           'text-orange-500 border-orange-500/20 bg-orange-500/5'
-                        }`}>
-                          {p.status}
-                        </span>
+                        }`}>{p.status}</span>
                       </td>
                     </tr>
                   ))}
