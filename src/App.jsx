@@ -82,6 +82,7 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  // --- INTERGRAM WIDGET ---
   useEffect(() => {
     window.intergramId = INTERGRAM_ID;
     window.intergramCustomizations = {
@@ -136,6 +137,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- DATA LISTENERS ---
   useEffect(() => {
     if (!user || !db) return;
     const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
@@ -146,6 +148,31 @@ export default function App() {
     onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
+  // --- AUTO-EXPIRY WATCHER ---
+  useEffect(() => {
+    if (user?.role !== 'admin' || !assignments.length) return;
+
+    const checkExpirations = async () => {
+      const now = new Date();
+      for (const asgn of assignments) {
+        const expiryDate = new Date(asgn.expiry);
+        if (now > expiryDate && !asgn.expiryNotified) {
+          sendEmail(asgn.clientEmail, "SwifftNet: Node Expired ⚠️", 
+            `Your VPN node for port ${asgn.port} has expired. Please top up your account to restore service.`);
+          
+          sendEmail(ADMIN_EMAIL, `Alert: Node Expired (${asgn.clientEmail})`, 
+            `User ${asgn.clientEmail} has an expired port (${asgn.port}).`);
+
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
+            expiryNotified: true
+          });
+        }
+      }
+    };
+    checkExpirations();
+  }, [assignments, user]);
+
+  // --- HANDLERS ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -201,7 +228,6 @@ export default function App() {
       email: user.email, status: 'pending', type: 'trial', service: requestService, protocol: vpnProtocol, 
       note: clientNote || "Free Trial", date: new Date().toLocaleDateString()
     });
-    setClientNote("");
   };
 
   const adminAssignTunnel = async (reqId, email, data, type) => {
@@ -216,17 +242,29 @@ export default function App() {
       pass: data.p, 
       port: data.port, 
       service: data.service, 
-      expiry: exp.toISOString() 
+      expiry: exp.toISOString(),
+      expiryNotified: false
     });
     
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
     
-    // CUSTOM EMAIL FORMAT: Your {SERVICE} port {PORT} is ready.
     sendEmail(
       email, 
       "SwifftNet: Port Ready! 🚀", 
       `Your ${data.service.toUpperCase()} port ${data.port} is ready.`
     );
+  };
+
+  /**
+   * --- NEW: RESEND ACTIVATION EMAIL ---
+   */
+  const resendActivationEmail = (asgn) => {
+    sendEmail(
+      asgn.clientEmail, 
+      "SwifftNet: Port Activation Resent 🚀", 
+      `Your ${asgn.service.toUpperCase()} port ${asgn.port} is ready.`
+    );
+    alert(`Activation email resent to ${asgn.clientEmail}`);
   };
 
   const handleCopy = (text, id) => {
@@ -237,6 +275,7 @@ export default function App() {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
 
+  // --- VIEWS ---
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
@@ -257,7 +296,6 @@ export default function App() {
     );
   }
 
-  // --- CLIENT DASHBOARD ---
   if (view === 'dashboard' && user) {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
@@ -331,14 +369,14 @@ export default function App() {
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 
-                // --- MULTI-LINE MIKROTIK SCRIPT LOGIC ---
+                // --- MULTI-LINE MIKROTIK CONFIG ---
                 const script = asgn ? `${protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
                   : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
                 }
-/ip firewall filter add action=accept chain=input comment="SwifftNet Access" src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=input comment="SwifftNet Priority" place-before=0 src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=forward comment="SwifftNet Forward" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24
 /ip service
 set api address=192.168.89.0/24
 set api-ssl address=192.168.89.0/24
@@ -359,10 +397,8 @@ set telnet address=192.168.89.0/24` : "";
                         <div className="text-center space-y-6">
                             <p className="text-slate-400 font-bold">This node has expired. Please renew to continue service.</p>
                             {bal >= VPN_PRICE ? (
-                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew Now (₱{VPN_PRICE})</button>
-                            ) : (
-                                <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance to Renew</p>
-                            )}
+                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew (₱{VPN_PRICE})</button>
+                            ) : <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
@@ -476,10 +512,15 @@ set telnet address=192.168.89.0/24` : "";
                         <td className="p-12">
                           <div className="space-y-4">
                             {assignments.filter(a => a.clientEmail === email).map((t, i) => (
-                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 relative group">
+                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 relative group min-w-[220px]">
                                 <span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span>
                                 <span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span>
-                                <button onClick={async() => { if(window.confirm("Terminate?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button>
+                                
+                                {/* ADMIN NODE ACTIONS */}
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => resendActivationEmail(t)} className="bg-blue-600/20 text-blue-500 text-[8px] font-black p-2 rounded-lg hover:bg-blue-600 hover:text-white transition-all">RESEND</button>
+                                  <button onClick={async() => { if(window.confirm("Terminate?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="bg-red-500/10 text-red-500 text-[8px] font-black p-2 rounded-lg hover:bg-red-600 hover:text-white transition-all">DELETE</button>
+                                </div>
                               </div>
                             ))}
                           </div>
