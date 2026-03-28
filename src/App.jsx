@@ -82,6 +82,7 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  // --- SUPPORT WIDGET ---
   useEffect(() => {
     window.intergramId = INTERGRAM_ID;
     window.intergramCustomizations = {
@@ -114,6 +115,7 @@ export default function App() {
     emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY);
   };
 
+  // --- AUTH OBSERVER ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
@@ -135,6 +137,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- REAL-TIME DATA ---
   useEffect(() => {
     if (!user || !db) return;
     const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
@@ -145,6 +148,33 @@ export default function App() {
     onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
+  // --- AUTO-EXPIRY WATCHER ---
+  useEffect(() => {
+    if (user?.role !== 'admin' || !assignments.length) return;
+
+    const checkExpirations = async () => {
+      const now = new Date();
+      for (const asgn of assignments) {
+        const expiryDate = new Date(asgn.expiry);
+        if (now > expiryDate && !asgn.expiryNotified) {
+          // Notify Client
+          sendEmail(asgn.clientEmail, "SwifftNet: Node Expired ⚠️", 
+            `Your VPN node for port ${asgn.port} has expired. Please top up your account to restore service.`);
+          
+          // Notify Admin
+          sendEmail(ADMIN_EMAIL, `Alert: Node Expired (${asgn.clientEmail})`, 
+            `User ${asgn.clientEmail} has an expired port (${asgn.port}).`);
+
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
+            expiryNotified: true
+          });
+        }
+      }
+    };
+    checkExpirations();
+  }, [assignments, user]);
+
+  // --- HANDLERS ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -186,37 +216,25 @@ export default function App() {
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE) {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-        email: user.email, 
-        status: 'pending', 
-        type, 
-        vpnId, 
-        service: requestService, 
-        protocol: vpnProtocol, 
-        note: clientNote || (type === 'renewal' ? "Renewal Request" : ""), 
-        date: new Date().toLocaleDateString()
+        email: user.email, status: 'pending', type, vpnId, service: requestService, protocol: vpnProtocol, 
+        note: clientNote || (type === 'renewal' ? "Renewal" : ""), date: new Date().toLocaleDateString()
       });
       setClientNote("");
-      sendEmail(ADMIN_EMAIL, `New Node ${type.toUpperCase()}`, `User: ${user.email}\nService: ${requestService}`);
-    } else {
-        alert("Insufficient balance to renew or buy a node.");
-    }
+      sendEmail(ADMIN_EMAIL, `New Node Request`, `User: ${user.email}\nService: ${requestService}`);
+    } else { alert("Insufficient balance."); }
   };
 
   const createTrialRequest = async () => {
     if (requests.some(r => r.email === user.email && r.type === 'trial')) return alert("Trial already used.");
-    
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-      email: user.email, 
-      status: 'pending', 
-      type: 'trial', 
-      service: requestService, 
-      protocol: vpnProtocol, 
-      note: clientNote || "Free Trial Request", 
-      date: new Date().toLocaleDateString()
+      email: user.email, status: 'pending', type: 'trial', service: requestService, protocol: vpnProtocol, 
+      note: clientNote || "Free Trial", date: new Date().toLocaleDateString()
     });
-    setClientNote("");
   };
 
+  /**
+   * --- PORT ASSIGNMENT & UPDATED EMAIL LOGIC ---
+   */
   const adminAssignTunnel = async (reqId, email, data, type) => {
     const exp = new Date();
     const duration = type === 'trial' ? 1 : Number(data.days);
@@ -229,10 +247,18 @@ export default function App() {
       pass: data.p, 
       port: data.port, 
       service: data.service, 
-      expiry: exp.toISOString() 
+      expiry: exp.toISOString(),
+      expiryNotified: false
     });
+    
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
-    sendEmail(email, "SwifftNet: Port Ready! 🚀", `Your port ${data.port} is ready.`);
+    
+    // CUSTOM EMAIL FORMAT: Your {SERVICE} port {PORT} is ready.
+    sendEmail(
+      email, 
+      "SwifftNet: Port Ready! 🚀", 
+      `Your ${data.service.toUpperCase()} port ${data.port} is ready.`
+    );
   };
 
   const handleCopy = (text, id) => {
@@ -243,6 +269,7 @@ export default function App() {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
 
+  // --- VIEWS ---
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
@@ -256,7 +283,7 @@ export default function App() {
             <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
           </form>
           <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
-          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Switch to Login' : 'Create New Account'}</button>
+          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Switch to Login' : 'Create Account'}</button>
           {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{authError}</p>}
         </div>
       </div>
@@ -278,9 +305,7 @@ export default function App() {
               <div><h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1><p className="text-xs text-slate-500 font-bold uppercase mt-2">{user.email}</p></div>
             </div>
             <div className="flex gap-4">
-               <button onClick={openSupport} className="flex items-center gap-2 bg-slate-800 hover:bg-blue-600 text-white font-black text-[10px] uppercase px-6 py-3 rounded-2xl transition-all border border-slate-700">
-                 <IconTelegram /> Support
-               </button>
+               <button onClick={openSupport} className="flex items-center gap-2 bg-slate-800 hover:bg-blue-600 text-white font-black text-[10px] uppercase px-6 py-3 rounded-2xl transition-all border border-slate-700"><IconTelegram /> Support</button>
                {user.role === 'admin' && <button onClick={() => setView('admin')} className="bg-blue-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase">Admin Panel</button>}
                <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600 text-white font-black text-xs uppercase px-10 py-3 rounded-2xl transition-all">Sign Out</button>
             </div>
@@ -291,22 +316,17 @@ export default function App() {
               <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
               <p className="text-5xl font-black">₱{bal}</p>
             </div>
-
             <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
               <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Node Price</p>
               <p className="text-4xl font-black text-emerald-500">₱{VPN_PRICE}</p>
               <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Port / Per Year</p>
             </div>
-            
             {!hasTrialUsed && isAccountNew && (
               <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">24-Hour Trial</p>
-                <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">
-                  Claim Free Trial
-                </button>
+                <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Claim Free Trial</button>
               </div>
             )}
-
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
                <div className="flex flex-col lg:flex-row gap-4 items-center">
                   <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
@@ -325,7 +345,6 @@ export default function App() {
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              
               <div className="bg-slate-900/40 p-8 rounded-[40px] border border-blue-500/20 flex flex-col md:flex-row items-center gap-8 shadow-2xl animate-in fade-in duration-1000">
                 <div className="relative">
                   <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-3xl font-black shadow-lg border border-white/10">HK</div>
@@ -334,10 +353,7 @@ export default function App() {
                 <div className="text-center md:text-left space-y-2">
                   <h3 className="text-2xl font-black uppercase italic tracking-tighter">Howard Kingsley Ramos</h3>
                   <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">System Architect & Network Engineer</p>
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-slate-500 text-[11px] font-bold">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    Santa Ana, Cagayan Valley, Philippines
-                  </div>
+                  <div className="flex items-center justify-center md:justify-start gap-2 text-slate-500 text-[11px] font-bold"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Santa Ana, Cagayan Valley, Philippines</div>
                 </div>
               </div>
 
@@ -347,14 +363,14 @@ export default function App() {
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 
-                // --- MULTI-LINE MIKROTIK SCRIPT LOGIC ---
+                // --- MULTI-LINE MIKROTIK CONFIG ---
                 const script = asgn ? `${protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
                   : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
                 }
-/ip firewall filter add action=accept chain=input comment="SwifftNet Access" src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=input comment="SwifftNet Priority" place-before=0 src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=forward comment="SwifftNet Forward" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24
 /ip service
 set api address=192.168.89.0/24
 set api-ssl address=192.168.89.0/24
@@ -363,7 +379,7 @@ set ssh address=192.168.89.0/24
 set telnet address=192.168.89.0/24` : "";
 
                 return (
-                  <div key={req.id} className={`bg-slate-900 rounded-[50px] border overflow-hidden shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
+                  <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
                       <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500 border-red-500/20' : req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
@@ -375,10 +391,8 @@ set telnet address=192.168.89.0/24` : "";
                         <div className="text-center space-y-6">
                             <p className="text-slate-400 font-bold">This node has expired. Please renew to continue service.</p>
                             {bal >= VPN_PRICE ? (
-                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew Now (₱{VPN_PRICE})</button>
-                            ) : (
-                                <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance to Renew</p>
-                            )}
+                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew (₱{VPN_PRICE})</button>
+                            ) : <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
@@ -411,10 +425,7 @@ set telnet address=192.168.89.0/24` : "";
             <div className="space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Fund Account</h2>
               <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
-                <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center border-dashed">
-                  <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH</p>
-                  <p className="text-3xl font-black text-blue-500 font-mono">0968 385 9759</p>
-                </div>
+                <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center border-dashed"><p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH</p><p className="text-3xl font-black text-blue-500 font-mono">0968 385 9759</p></div>
                 <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-8">
                   <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none font-black" />
                   <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none font-black uppercase" />
@@ -436,7 +447,7 @@ set telnet address=192.168.89.0/24` : "";
     );
   }
 
-  // --- ADMIN VIEW ---
+  // --- ADMIN TERMINAL ---
   if (view === 'admin' && user) {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -453,48 +464,33 @@ set telnet address=192.168.89.0/24` : "";
 
           {adminTab === 'payments' && (
             <div className="grid md:grid-cols-3 gap-10">
-              {payments.filter(p => p.status === 'pending').length > 0 ? (
-                payments.filter(p => p.status === 'pending').map(p => (
-                  <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95">
-                    <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
-                    <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
-                    <div className="flex gap-4">
-                      <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button>
-                      <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
-                    </div>
+              {payments.filter(p => p.status === 'pending').map(p => (
+                <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95">
+                  <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
+                  <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
+                  <div className="flex gap-4">
+                    <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button>
+                    <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-3 text-center py-24 text-slate-800 font-black uppercase tracking-widest italic text-xl border-4 border-dashed border-slate-900 rounded-[60px]">System Clear: No Pending Payments</div>
-              )}
+                </div>
+              ))}
             </div>
           )}
 
           {adminTab === 'requests' && (
             <div className="grid md:grid-cols-2 gap-12">
-              {requests.filter(r => r.status === 'pending').length > 0 ? (
-                requests.filter(r => r.status === 'pending').map(r => (
-                  <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 ${r.type === 'trial' ? 'border-indigo-500 shadow-indigo-500/20' : 'border-slate-800'}`}>
-                    <div className="border-b border-slate-800 pb-6 flex justify-between items-start">
-                      <p className="font-black text-white text-lg truncate uppercase">{r.email}</p>
-                      <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest border border-blue-500/30 px-3 py-1 rounded-full">{r.type.toUpperCase()}</span>
-                    </div>
-                    <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
-                      <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
-                          <p className="text-[10px] text-blue-500 font-black uppercase mb-1">Protocol: {r.protocol || 'l2tp'}</p>
-                          <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Service: {r.service || 'winbox'}</p>
-                          <p className="text-sm italic">Note: {r.note || 'N/A'}</p>
-                      </div>
-                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
-                      <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
-                      <input name="port" placeholder="Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
-                      <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
-                    </form>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-2 text-center py-24 text-slate-800 font-black uppercase tracking-widest italic text-xl border-4 border-dashed border-slate-900 rounded-[60px]">All Provisioning Requests Complete</div>
-              )}
+              {requests.filter(r => r.status === 'pending').map(r => (
+                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
+                  <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p>
+                  <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
+                    <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800"><p className="text-[10px] text-blue-500 font-black">Protocol: {r.protocol || 'l2tp'}</p><p className="text-sm italic">Note: {r.note || 'N/A'}</p></div>
+                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
+                    <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
+                    <input name="port" placeholder="Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
+                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
+                  </form>
+                </div>
+              ))}
             </div>
           )}
 
@@ -510,10 +506,10 @@ set telnet address=192.168.89.0/24` : "";
                         <td className="p-12">
                           <div className="space-y-4">
                             {assignments.filter(a => a.clientEmail === email).map((t, i) => (
-                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 border-dashed relative group">
+                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 relative group">
                                 <span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span>
                                 <span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span>
-                                <button onClick={async() => { if(window.confirm("Terminate this port?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button>
+                                <button onClick={async() => { if(window.confirm("Terminate?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500/10 text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">DELETE</button>
                               </div>
                             ))}
                           </div>
@@ -524,36 +520,22 @@ set telnet address=192.168.89.0/24` : "";
                 </table>
               </div>
           )}
-
+          
           {adminTab === 'transactions' && (
-            <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
               <table className="w-full text-left font-mono">
-                <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest">
-                  <tr>
-                    <th className="p-12">Client</th><th className="p-12">Amount</th><th className="p-12">Ref No</th><th className="p-12">Date</th><th className="p-12 text-center">Status</th>
-                  </tr>
-                </thead>
+                <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12">Amount</th><th className="p-12">Ref No</th><th className="p-12 text-center">Status</th></tr></thead>
                 <tbody className="divide-y divide-slate-800">
                   {[...payments].reverse().map(p => (
-                    <tr key={p.id} className="hover:bg-slate-800/20 transition-all">
+                    <tr key={p.id} className="hover:bg-slate-800/20">
                       <td className="p-12 font-black text-white italic truncate max-w-[200px]">{p.email}</td>
                       <td className="p-12 font-black text-emerald-500">₱{p.amount}</td>
                       <td className="p-12 text-slate-400">{p.refNo}</td>
-                      <td className="p-12 text-slate-400">{p.date}</td>
-                      <td className="p-12 text-center">
-                        <span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] tracking-widest ${
-                          p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 
-                          p.status === 'denied' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
-                          'text-orange-500 border-orange-500/20 bg-orange-500/5'
-                        }`}>{p.status}</span>
-                      </td>
+                      <td className="p-12 text-center"><span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>{p.status}</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {payments.length === 0 && (
-                <div className="p-20 text-center text-slate-600 font-black uppercase tracking-widest italic">No transaction logs found in core.</div>
-              )}
             </div>
           )}
         </div>
