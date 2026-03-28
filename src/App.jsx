@@ -82,7 +82,6 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
-  // --- SUPPORT WIDGET ---
   useEffect(() => {
     window.intergramId = INTERGRAM_ID;
     window.intergramCustomizations = {
@@ -137,7 +136,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- REAL-TIME DATA ---
   useEffect(() => {
     if (!user || !db) return;
     const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
@@ -148,33 +146,6 @@ export default function App() {
     onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
-  // --- AUTO-EXPIRY WATCHER ---
-  useEffect(() => {
-    if (user?.role !== 'admin' || !assignments.length) return;
-
-    const checkExpirations = async () => {
-      const now = new Date();
-      for (const asgn of assignments) {
-        const expiryDate = new Date(asgn.expiry);
-        if (now > expiryDate && !asgn.expiryNotified) {
-          // Notify Client
-          sendEmail(asgn.clientEmail, "SwifftNet: Node Expired ⚠️", 
-            `Your VPN node for port ${asgn.port} has expired. Please top up your account to restore service.`);
-          
-          // Notify Admin
-          sendEmail(ADMIN_EMAIL, `Alert: Node Expired (${asgn.clientEmail})`, 
-            `User ${asgn.clientEmail} has an expired port (${asgn.port}).`);
-
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
-            expiryNotified: true
-          });
-        }
-      }
-    };
-    checkExpirations();
-  }, [assignments, user]);
-
-  // --- HANDLERS ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -230,11 +201,9 @@ export default function App() {
       email: user.email, status: 'pending', type: 'trial', service: requestService, protocol: vpnProtocol, 
       note: clientNote || "Free Trial", date: new Date().toLocaleDateString()
     });
+    setClientNote("");
   };
 
-  /**
-   * --- PORT ASSIGNMENT & UPDATED EMAIL LOGIC ---
-   */
   const adminAssignTunnel = async (reqId, email, data, type) => {
     const exp = new Date();
     const duration = type === 'trial' ? 1 : Number(data.days);
@@ -247,8 +216,7 @@ export default function App() {
       pass: data.p, 
       port: data.port, 
       service: data.service, 
-      expiry: exp.toISOString(),
-      expiryNotified: false
+      expiry: exp.toISOString() 
     });
     
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
@@ -269,7 +237,6 @@ export default function App() {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
 
-  // --- VIEWS ---
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
@@ -290,6 +257,7 @@ export default function App() {
     );
   }
 
+  // --- CLIENT DASHBOARD ---
   if (view === 'dashboard' && user) {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
@@ -363,14 +331,14 @@ export default function App() {
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 
-                // --- MULTI-LINE MIKROTIK CONFIG ---
+                // --- MULTI-LINE MIKROTIK SCRIPT LOGIC ---
                 const script = asgn ? `${protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
                   : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
                 }
-/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="SwifftNet Access" src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="SwifftNet Priority" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=forward comment="SwifftNet Forward" place-before=0 src-address=192.168.89.0/24
 /ip service
 set api address=192.168.89.0/24
 set api-ssl address=192.168.89.0/24
@@ -391,8 +359,10 @@ set telnet address=192.168.89.0/24` : "";
                         <div className="text-center space-y-6">
                             <p className="text-slate-400 font-bold">This node has expired. Please renew to continue service.</p>
                             {bal >= VPN_PRICE ? (
-                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew (₱{VPN_PRICE})</button>
-                            ) : <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance</p>}
+                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew Now (₱{VPN_PRICE})</button>
+                            ) : (
+                                <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance to Renew</p>
+                            )}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
