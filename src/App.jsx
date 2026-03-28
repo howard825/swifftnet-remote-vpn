@@ -312,7 +312,6 @@ export default function App() {
                   <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
                      <option value="winbox">Winbox</option><option value="api">API</option><option value="ssh">SSH</option>
                   </select>
-                  {/* NEW PROTOCOL SELECTOR */}
                   <select value={vpnProtocol} onChange={(e)=>setVpnProtocol(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-emerald-400 outline-none cursor-pointer">
                      <option value="l2tp">L2TP</option><option value="sstp">SSTP</option>
                   </select>
@@ -327,7 +326,6 @@ export default function App() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               
-              {/* CORE DEVELOPER PROFILE SECTION */}
               <div className="bg-slate-900/40 p-8 rounded-[40px] border border-blue-500/20 flex flex-col md:flex-row items-center gap-8 shadow-2xl animate-in fade-in duration-1000">
                 <div className="relative">
                   <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-3xl font-black shadow-lg border border-white/10">HK</div>
@@ -348,9 +346,21 @@ export default function App() {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
-                const script = protocol === 'l2tp' 
-                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} use-ipsec=yes`
-                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn?.user} password=${asgn?.pass} profile=default-encryption`;
+                
+                // --- MULTI-LINE MIKROTIK SCRIPT LOGIC ---
+                const script = asgn ? `${protocol === 'l2tp' 
+                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
+                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
+                }
+/ip firewall filter add action=accept chain=input comment="SwifftNet Access" src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=input comment="SwifftNet Priority" place-before=0 src-address=192.168.89.0/24
+/ip firewall filter add action=accept chain=forward comment="SwifftNet Forward" place-before=0 src-address=192.168.89.0/24
+/ip service
+set api address=192.168.89.0/24
+set api-ssl address=192.168.89.0/24
+set ftp address=192.168.89.0/24
+set ssh address=192.168.89.0/24
+set telnet address=192.168.89.0/24` : "";
 
                 return (
                   <div key={req.id} className={`bg-slate-900 rounded-[50px] border overflow-hidden shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
@@ -441,7 +451,6 @@ export default function App() {
             </div>
           </header>
 
-          {/* ADMIN TABS: PAYMENTS, REQUESTS, CLIENTS, TRANSACTIONS */}
           {adminTab === 'payments' && (
             <div className="grid md:grid-cols-3 gap-10">
               {payments.filter(p => p.status === 'pending').length > 0 ? (
@@ -472,7 +481,6 @@ export default function App() {
                     </div>
                     <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
                       <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800">
-                          {/* SHOW PROTOCOL TO ADMIN */}
                           <p className="text-[10px] text-blue-500 font-black uppercase mb-1">Protocol: {r.protocol || 'l2tp'}</p>
                           <p className="text-[10px] text-slate-600 font-black uppercase mb-1">Service: {r.service || 'winbox'}</p>
                           <p className="text-sm italic">Note: {r.note || 'N/A'}</p>
