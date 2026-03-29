@@ -243,7 +243,8 @@ export default function App() {
       port: data.port, 
       service: data.service, 
       expiry: exp.toISOString(),
-      expiryNotified: false
+      expiryNotified: false,
+      isOnline: false // Initialize status as offline
     });
     
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
@@ -255,9 +256,6 @@ export default function App() {
     );
   };
 
-  /**
-   * --- NEW: RESEND ACTIVATION EMAIL ---
-   */
   const resendActivationEmail = (asgn) => {
     sendEmail(
       asgn.clientEmail, 
@@ -368,8 +366,8 @@ export default function App() {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
-                
-                // --- MULTI-LINE MIKROTIK CONFIG ---
+                const isOnline = asgn?.isOnline === true; // Connection Status check
+
                 const script = asgn ? `${protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
                   : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
@@ -387,9 +385,15 @@ set telnet address=192.168.89.0/24` : "";
                 return (
                   <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
-                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
-                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500 border-red-500/20' : req.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
-                        {isExpired ? 'EXPIRED' : req.status}
+                      <div className="flex items-center gap-3">
+                        {/* ONLINE/OFFLINE INDICATOR */}
+                        {!isExpired && (asgn) && (
+                          <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
+                        )}
+                        <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500 border-red-500/20' : isOnline ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                        {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
                       </span>
                     </div>
                     <div className="p-12">
