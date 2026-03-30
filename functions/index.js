@@ -71,3 +71,38 @@ exports.inboundEmail = functions.https.onRequest(async (req, res) => {
 
   bb.end(req.rawBody);
 });
+
+
+// Add this to your existing Cloud Functions file
+exports.updateNodeStatus = functions.https.onRequest(async (req, res) => {
+  const { vpnUser, status } = req.query; // e.g. ?vpnUser=howard&status=online
+
+  if (!vpnUser) return res.status(400).send("Missing User");
+
+  try {
+    const asgnRef = admin.firestore()
+      .collection("artifacts")
+      .doc("swifftnet-remote-v3")
+      .collection("public")
+      .doc("data")
+      .collection("assignments");
+
+    // Find the assignment with this VPN username
+    const snapshot = await asgnRef.where("user", "==", vpnUser).get();
+
+    if (snapshot.empty) return res.status(404).send("Node not found");
+
+    const batch = admin.firestore().batch();
+    snapshot.forEach(doc => {
+      batch.update(doc.ref, { 
+        isOnline: status === "online",
+        lastSeen: admin.firestore.FieldValue.serverTimestamp() 
+      });
+    });
+
+    await batch.commit();
+    res.status(200).send("Status Updated");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});

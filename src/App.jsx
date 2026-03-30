@@ -206,6 +206,31 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     checkExpirations();
   }, [assignments, user]);
 
+  // --- ADD THE AUTO-OFFLINE LOGIC HERE ---
+  useEffect(() => {
+    // Only the admin needs to run this "cleaner" logic to update the DB
+    if (user?.role !== 'admin' || !assignments.length) return;
+
+    const interval = setInterval(() => {
+      assignments.forEach(async (asgn) => {
+        // If node is marked online but we haven't heard from it in 3 minutes
+        if (asgn.isOnline && asgn.lastSeen) {
+          const lastSeenDate = new Date(asgn.lastSeen.seconds * 1000);
+          const secondsSinceLastPing = (new Date() - lastSeenDate) / 1000;
+          
+          if (secondsSinceLastPing > 180) { // 180 seconds = 3 minutes
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
+              isOnline: false
+            });
+            console.log(`Node ${asgn.port} timed out and marked offline.`);
+          }
+        }
+      });
+    }, 60000); // Check every 60 seconds
+
+    return () => clearInterval(interval); // Cleanup on logout/close
+  }, [assignments, user]);
+
   // --- HANDLERS ---
   const getUserBalance = (email) => {
     const deposits = payments
@@ -679,34 +704,116 @@ set ssh address=192.168.89.0/24` : "";
           )}
 
           {adminTab === 'clients' && (
-              <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
-                <table className="w-full text-left font-mono">
-                  <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Balance</th><th className="p-12">Ports (W | S)</th></tr></thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {getAllClients().map(email => (
-                      <tr key={email} className="hover:bg-slate-800/20 transition-all">
-                        <td className="p-12 font-black text-white italic truncate max-w-[200px]">{email}</td>
-                        <td className="p-12 text-center font-black text-emerald-500 text-2xl">₱{getUserBalance(email)}</td>
-                        <td className="p-12">
-                          <div className="space-y-4">
-                            {assignments.filter(a => a.clientEmail === email).map((t, i) => (
-                              <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 relative group min-w-[220px]">
-                                <span className="text-blue-500 font-mono text-[11px] font-black">WIN: {t.port} | SSH: {t.portAux}</span>
-                                <span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span>
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => resendActivationEmail(t)} className="bg-blue-600/20 text-blue-500 text-[8px] font-black p-2 rounded-lg">RESEND</button>
-                                  <button onClick={async() => { if(window.confirm("Delete?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="bg-red-500/10 text-red-500 text-[8px] font-black p-2 rounded-lg">DEL</button>
+          <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in duration-500">
+            <table className="w-full text-left font-mono">
+              <thead className="bg-slate-800/50 text-[11px] uppercase font-black text-slate-500 tracking-widest border-b border-slate-800">
+                <tr>
+                  <th className="p-10">Client Profile</th>
+                  <th className="p-10 text-center">Net Balance</th>
+                  <th className="p-10">Network Nodes (Ports & Status)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {getAllClients().map(email => (
+                  <tr key={email} className="hover:bg-slate-800/20 transition-all group">
+                    {/* CLIENT INFO */}
+                    <td className="p-10 align-top">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-black text-white italic truncate max-w-[250px] text-sm group-hover:text-blue-400 transition-colors">
+                          {email}
+                        </span>
+                        <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">
+                          Verified SwifftNet User
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* BALANCE INFO */}
+                    <td className="p-10 text-center align-top">
+                      <div className="bg-slate-950/50 inline-block px-6 py-3 rounded-2xl border border-slate-800">
+                        <p className="text-2xl font-black text-emerald-500">₱{getUserBalance(email)}</p>
+                        <p className="text-[8px] text-slate-600 font-black uppercase">Available Credits</p>
+                      </div>
+                    </td>
+
+                    {/* ASSIGNMENTS / NODES */}
+                    <td className="p-10 align-top">
+                      <div className="space-y-4">
+                        {assignments.filter(a => a.clientEmail === email).length > 0 ? (
+                          assignments.filter(a => a.clientEmail === email).map((t, i) => (
+                            <div 
+                              key={i} 
+                              className={`bg-slate-950 p-5 rounded-3xl border transition-all relative group/node min-w-[280px] shadow-lg ${
+                                t.isOnline 
+                                ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
+                                : 'border-slate-800'
+                              }`}
+                            >
+                              {/* HEADER: STATUS & PORTS */}
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex flex-col">
+                                  <span className="text-blue-400 font-mono text-[11px] font-black uppercase leading-none">
+                                    Winbox: <span className="text-white">{t.port}</span>
+                                  </span>
+                                  <span className="text-blue-600 font-mono text-[11px] font-black uppercase mt-1">
+                                    SSH/API: <span className="text-white">{t.portAux || 'N/A'}</span>
+                                  </span>
+                                </div>
+                                
+                                {/* LIVE INDICATOR */}
+                                <div className="flex flex-col items-end gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>
+                                      {t.isOnline ? 'Active' : 'Offline'}
+                                    </span>
+                                    <div className={`w-2 h-2 rounded-full ${t.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-700'}`} />
+                                  </div>
+                                  {t.lastSeen && (
+                                    <span className="text-[7px] text-slate-700 font-black uppercase">
+                                      Ping: {new Date(t.lastSeen.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-          )}
+
+                              {/* EXPIRY INFO */}
+                              <div className="flex justify-between items-center pt-3 border-t border-slate-900">
+                                <span className="text-slate-600 font-mono text-[9px] font-black italic uppercase">
+                                  Exp: {new Date(t.expiry).toLocaleDateString()}
+                                </span>
+                                
+                                {/* ADMIN ACTIONS ON HOVER */}
+                                <div className="flex items-center gap-2 opacity-0 group-hover/node:opacity-100 transition-opacity">
+                                  <button 
+                                    onClick={() => resendActivationEmail(t)} 
+                                    className="bg-blue-600/10 text-blue-500 text-[8px] font-black px-3 py-1.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all border border-blue-500/20"
+                                  >
+                                    RESEND
+                                  </button>
+                                  <button 
+                                    onClick={async() => { 
+                                      if(window.confirm(`Terminate node ${t.port} for ${email}?`)) 
+                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); 
+                                    }} 
+                                    className="bg-red-500/10 text-red-500 text-[8px] font-black px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-500/20"
+                                  >
+                                    DELETE
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-slate-700 font-black uppercase italic">No Active Nodes Found</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         </div>
       </div>
     );
