@@ -604,33 +604,74 @@ set ssh address=192.168.89.0/24` : "";
 
           {adminTab === 'tickets' && (
             <div className="grid md:grid-cols-3 gap-8">
-              {tickets.filter(t => t.status !== 'closed').map(t => (
-                <div key={t.id} onClick={()=>setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-105 transition-all ${t.status === 'open' ? 'border-l-4 border-l-red-500' : ''}`}>
-                  <p className="text-[10px] font-black text-slate-500 mb-2 truncate">{t.clientEmail}</p>
-                  <p className="text-sm font-black uppercase mb-4 truncate">{t.subject}</p>
-                  <button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase">View Chat</button>
+              {/* TICKET LIST */}
+              {tickets.filter(t => t.status !== 'closed').sort((a,b) => new Date(b.lastUpdate) - new Date(a.lastUpdate)).map(t => (
+                <div key={t.id} onClick={() => setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group ${t.status === 'open' ? 'border-l-4 border-l-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]' : 'border-l-4 border-l-emerald-500'}`}>
+                  <p className="text-[10px] font-black text-blue-500 mb-2 truncate uppercase tracking-widest">{t.clientEmail}</p>
+                  <p className="text-sm font-black uppercase mb-4 truncate italic">{t.subject}</p>
+                  <div className="flex justify-between items-center text-[9px] font-black text-slate-500">
+                    <span>LAST: {new Date(t.lastUpdate).toLocaleTimeString()}</span>
+                    <span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
+                  </div>
+                  <button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase mt-6 group-hover:bg-blue-500 transition-colors">Open Conversation</button>
                 </div>
               ))}
 
+              {/* ADMIN CHAT MODAL */}
               {activeTicket && (
-                <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[100]">
-                  <div className="bg-slate-900 w-full max-w-2xl h-[85vh] rounded-[50px] border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.2)]">
+                <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 md:p-10 z-[100] animate-in fade-in duration-300">
+                  <div className="bg-slate-900 w-full max-w-3xl h-[90vh] rounded-[50px] border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_60px_rgba(37,99,235,0.2)]">
+                    
+                    {/* MODAL HEADER */}
                     <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
-                      <div><p className="text-[10px] text-blue-500 font-black">{activeTicket.clientEmail}</p><p className="font-black uppercase tracking-tight">{activeTicket.subject}</p></div>
-                      <button onClick={()=>setActiveTicket(null)} className="text-xs font-black text-red-500 uppercase px-6 py-2 border border-red-500/20 rounded-full">Close Modal</button>
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {activeTicket.id.slice(-6)}</p>
+                        <h2 className="font-black uppercase tracking-tight text-lg italic">{activeTicket.subject}</h2>
+                        <p className="text-[9px] text-slate-500 font-bold">{activeTicket.clientEmail}</p>
+                      </div>
+                      <div className="flex gap-4">
+                        {/* CLOSE TICKET BUTTON */}
+                        <button 
+                            onClick={async () => {
+                              if(window.confirm("Close this ticket? Client will be notified.")) {
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id), { status: 'closed', lastUpdate: new Date().toISOString() });
+                                sendEmail(activeTicket.clientEmail, "Ticket Closed ✅", `Your support ticket regarding "${activeTicket.subject}" has been marked as resolved.`);
+                                setActiveTicket(null);
+                              }
+                            }}
+                            className="px-6 py-2 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-full hover:bg-red-500 hover:text-white transition-all"
+                        >
+                            Close Ticket
+                        </button>
+                        <button onClick={() => setActiveTicket(null)} className="text-xs font-black text-slate-500 uppercase px-4 py-2 bg-slate-800 rounded-full hover:bg-slate-700">Back</button>
+                      </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+
+                    {/* CHAT MESSAGES */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]">
                       {messages.map(m => (
-                        <div key={m.id} className={`p-5 rounded-[2rem] max-w-[85%] text-sm ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
-                          {m.text}
-                          <p className="text-[7px] mt-2 opacity-50 uppercase text-right">{m.sender === user.email ? 'Admin' : 'Client'}</p>
+                        <div key={m.id} className={`flex flex-col ${m.sender === user.email ? 'items-end' : 'items-start'}`}>
+                          <div className={`p-5 rounded-[2rem] max-w-[85%] text-sm font-medium shadow-xl ${m.sender === user.email ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none'}`}>
+                            {m.text}
+                          </div>
+                          <p className="text-[8px] mt-2 opacity-40 uppercase font-black tracking-widest px-2">{m.sender === user.email ? 'Admin (You)' : 'Client Response'}</p>
                         </div>
                       ))}
                     </div>
-                    <form onSubmit={handleReply} className="p-8 bg-slate-950 flex gap-4">
-                      <input value={replyBody} onChange={e=>setReplyBody(e.target.value)} placeholder="Type reply message..." className="flex-1 bg-slate-900 border border-slate-800 p-5 rounded-[2rem] outline-none font-bold" />
-                      <button className="bg-emerald-600 px-10 rounded-[2rem] font-black uppercase text-xs">Reply</button>
+
+                    {/* ADMIN REPLY FORM */}
+                    <form onSubmit={handleReply} className="p-8 bg-slate-950 border-t border-slate-800 flex gap-4">
+                      <input 
+                        value={replyBody} 
+                        onChange={e => setReplyBody(e.target.value)} 
+                        placeholder="Type your official response..." 
+                        className="flex-1 bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] outline-none font-bold text-sm focus:border-blue-500 transition-all" 
+                      />
+                      <button className="bg-blue-600 hover:bg-blue-500 px-10 rounded-[2.5rem] font-black uppercase text-xs shadow-lg transition-all flex items-center gap-2">
+                        Send Reply
+                      </button>
                     </form>
+
                   </div>
                 </div>
               )}
