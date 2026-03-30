@@ -514,7 +514,7 @@ set ssh address=192.168.89.0/24` : "";
                               </p>
                               <div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner">
                                 <code className="text-emerald-400 font-black text-lg font-mono tracking-tighter">
-                                  remote.swifftnet.site:<span className="text-white underline">{asgn.port}</span>
+                                  remote.swifftnet.site:<span className="text-white underline"> your port number na naka assign, please check the ports below </span>
                                 </code>
                               </div>
                               <div className="pt-4 border-t border-emerald-500/10 flex justify-between items-center">
