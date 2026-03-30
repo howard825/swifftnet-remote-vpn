@@ -73,11 +73,12 @@ exports.inboundEmail = functions.https.onRequest(async (req, res) => {
 });
 
 
-// Add this to your existing Cloud Functions file
-exports.updateNodeStatus = functions.https.onRequest(async (req, res) => {
-  const { vpnUser, status } = req.query; // e.g. ?vpnUser=howard&status=online
+// This MUST be updateVpnStatus to match your screenshot
+exports.updateVpnStatus = functions.https.onRequest(async (req, res) => {
+  // Use vpnUser and status to match the script above
+  const { vpnUser, status } = req.query; 
 
-  if (!vpnUser) return res.status(400).send("Missing User");
+  if (!vpnUser) return res.status(400).send("Missing vpnUser parameter");
 
   try {
     const asgnRef = admin.firestore()
@@ -87,10 +88,12 @@ exports.updateNodeStatus = functions.https.onRequest(async (req, res) => {
       .doc("data")
       .collection("assignments");
 
-    // Find the assignment with this VPN username
     const snapshot = await asgnRef.where("user", "==", vpnUser).get();
 
-    if (snapshot.empty) return res.status(404).send("Node not found");
+    if (snapshot.empty) {
+      console.log("No assignment found for user:", vpnUser);
+      return res.status(404).send("User not found in Database");
+    }
 
     const batch = admin.firestore().batch();
     snapshot.forEach(doc => {
@@ -101,8 +104,8 @@ exports.updateNodeStatus = functions.https.onRequest(async (req, res) => {
     });
 
     await batch.commit();
-    res.status(200).send("Status Updated");
+    return res.status(200).send("Status Synced");
   } catch (error) {
-    res.status(500).send(error.message);
+    return res.status(500).send(error.message);
   }
 });
