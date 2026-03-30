@@ -340,40 +340,42 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
 
   const handleReply = async (e) => {
   e.preventDefault();
-  // Ensure we have a message and a ticket to reply to
-  if (!replyBody || !activeTicket) return;
+  if (!replyBody || !activeTicket) {
+    console.log("Missing body or active ticket");
+    return;
+  }
 
   try {
+    console.log("Attempting reply to ticket:", activeTicket.id);
+    
+    // 1. Reference the specific ticket
     const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
     const messagesCol = collection(ticketRef, 'messages');
 
-    // 1. Add message to Firestore
+    // 2. Try to add the message
     await addDoc(messagesCol, {
       sender: user.email,
       text: replyBody,
       timestamp: serverTimestamp()
     });
+    console.log("Message added to Firestore");
 
-    // 2. Update Ticket Status and Timestamp
-    // If admin replies, status becomes 'answered'. If client replies, it stays/becomes 'open'.
+    // 3. Try to update the main ticket
     await updateDoc(ticketRef, {
       lastUpdate: new Date().toISOString(),
       status: user.role === 'admin' ? 'answered' : 'open'
     });
+    console.log("Ticket status updated");
 
-    // 3. Send Email Notification
+    // 4. Send Email
     const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
-    const subject = `New Reply: ${activeTicket.subject}`;
-    const body = `${user.name} sent a new message regarding your ticket.`;
-    
-    sendEmail(notifyEmail, subject, body, activeTicket.id);
+    sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
 
-    // 4. Clear Input
     setReplyBody("");
-    console.log("Reply sent successfully.");
   } catch (err) {
-    console.error("Error sending reply:", err);
-    alert("Failed to send reply. Please check your connection.");
+    // This will tell us the REAL error in the console
+    console.error("DETAILED ERROR:", err.code, err.message);
+    alert(`Failed to send reply: ${err.message}`);
   }
 };
 
@@ -759,7 +761,7 @@ set ssh address=192.168.89.0/24` : "";
                         placeholder="Type your official response..." 
                         className="flex-1 bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] outline-none font-bold text-sm focus:border-blue-500 transition-all" 
                       />
-                      <button className="bg-blue-600 hover:bg-blue-500 px-10 rounded-[2.5rem] font-black uppercase text-xs shadow-lg transition-all flex items-center gap-2">
+                      <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-10 rounded-[2.5rem] font-black uppercase text-xs shadow-lg transition-all flex items-center gap-2">
                         Send Reply
                       </button>
                     </form>
