@@ -17,7 +17,11 @@ import {
   onSnapshot, 
   updateDoc, 
   doc,
-  deleteDoc
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp
 } from 'firebase/firestore';
 
 /**
@@ -62,6 +66,7 @@ const IconGoogle = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="c
 const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconTelegram = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>;
+const IconTicket = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -81,6 +86,13 @@ export default function App() {
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assignments, setAssignments] = useState([]);
+
+  // --- SUPPORT TICKET STATES ---
+  const [tickets, setTickets] = useState([]);
+  const [activeTicket, setActiveTicket] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [replyBody, setReplyBody] = useState("");
 
   // --- INTERGRAM WIDGET ---
   useEffect(() => {
@@ -110,10 +122,20 @@ export default function App() {
     else alert("Support widget is still loading.");
   };
 
-  const sendEmail = (toEmail, subject, body) => {
-    const templateParams = { to_email: toEmail, subject: subject, message: body };
-    emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY);
+  // --- UPDATED EMAIL SENDER ---
+const sendEmail = (toEmail, subject, body, ticketId = "General") => {
+  const templateParams = { 
+    to_email: toEmail, 
+    subject: `[Ticket #${ticketId}] ${subject}`, 
+    message: body,
+    // Change 'your-registered-domain.com' to your actual domain
+    reply_to: `reply+${ticketId}@your-registered-domain.com` 
   };
+  
+  emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY)
+    .then(() => console.log("Email Sent via SwifftNet Core"))
+    .catch((err) => console.error("Email Error:", err));
+};
 
   // --- AUTH OBSERVER ---
   useEffect(() => {
@@ -140,13 +162,25 @@ export default function App() {
   // --- DATA LISTENERS ---
   useEffect(() => {
     if (!user || !db) return;
-    const pCol = collection(db, 'artifacts', appId, 'public', 'data', 'payments');
-    const rCol = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
-    const aCol = collection(db, 'artifacts', appId, 'public', 'data', 'assignments');
-    onSnapshot(pCol, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    onSnapshot(rCol, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    onSnapshot(aCol, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const base = ['artifacts', appId, 'public', 'data'];
+    
+    onSnapshot(collection(db, ...base, 'payments'), (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    onSnapshot(collection(db, ...base, 'requests'), (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    onSnapshot(collection(db, ...base, 'assignments'), (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    // Support Ticket Listener
+    const tCol = collection(db, ...base, 'tickets');
+    const tQuery = user.role === 'admin' ? tCol : query(tCol, where('clientEmail', '==', user.email));
+    onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
+
+  // Message Listener for active ticket
+  useEffect(() => {
+    if (!activeTicket || !db) return;
+    const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages');
+    const mQuery = query(mCol, orderBy('timestamp', 'asc'));
+    return onSnapshot(mQuery, (s) => setMessages(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [activeTicket]);
 
   // --- AUTO-EXPIRY WATCHER ---
   useEffect(() => {
@@ -230,6 +264,7 @@ export default function App() {
     });
   };
 
+  // --- NEW: DUAL PORT ASSIGNMENT ---
   const adminAssignTunnel = async (reqId, email, data, type) => {
     const exp = new Date();
     const duration = type === 'trial' ? 1 : Number(data.days);
@@ -240,29 +275,69 @@ export default function App() {
       clientEmail: email, 
       user: data.u, 
       pass: data.p, 
-      port: data.port, 
+      port: data.port, // Port 1: Winbox
+      portAux: data.portAux, // Port 2: SSH/API
       service: data.service, 
       expiry: exp.toISOString(),
       expiryNotified: false,
-      isOnline: false // Initialize status as offline
+      isOnline: false 
     });
     
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
     
     sendEmail(
       email, 
-      "SwifftNet: Port Ready! 🚀", 
-      `Your ${data.service.toUpperCase()} port ${data.port} is ready.`
+      "SwifftNet: Nodes Assigned! 🚀", 
+      `Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
     );
+  };
+
+  // --- NEW: SUPPORT TICKET HANDLERS ---
+  const createTicket = async (e) => {
+    e.preventDefault();
+    if (!ticketSubject) return;
+    const tRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets'), {
+      clientEmail: user.email,
+      subject: ticketSubject,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      lastUpdate: new Date().toISOString()
+    });
+    sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`, tRef.id);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets', tRef.id, 'messages'), {
+      sender: user.email,
+      text: `Support Request: ${ticketSubject}`,
+      timestamp: serverTimestamp()
+    });
+    sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`);
+    setTicketSubject("");
+  };
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    if (!replyBody || !activeTicket) return;
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages'), {
+      sender: user.email,
+      text: replyBody,
+      timestamp: serverTimestamp()
+    });
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id), {
+      lastUpdate: new Date().toISOString(),
+      status: user.role === 'admin' ? 'answered' : 'open'
+    });
+    
+    const notifyTarget = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
+    sendEmail(notifyTarget, "New Ticket Reply", `New message: ${replyBody}`, activeTicket.id);
+    setReplyBody("");
   };
 
   const resendActivationEmail = (asgn) => {
     sendEmail(
       asgn.clientEmail, 
       "SwifftNet: Port Activation Resent 🚀", 
-      `Your ${asgn.service.toUpperCase()} port ${asgn.port} is ready.`
+      `Your ports: Winbox ${asgn.port}, Secondary ${asgn.portAux}`
     );
-    alert(`Activation email resent to ${asgn.clientEmail}`);
+    alert(`Activation resent to ${asgn.clientEmail}`);
   };
 
   const handleCopy = (text, id) => {
@@ -323,12 +398,12 @@ export default function App() {
             <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
               <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Node Price</p>
               <p className="text-4xl font-black text-emerald-500">₱{VPN_PRICE}</p>
-              <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Port / Per Year</p>
+              <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Node / Year</p>
             </div>
             {!hasTrialUsed && isAccountNew && (
               <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">24-Hour Trial</p>
-                <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Claim Free Trial</button>
+                <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Claim Trial</button>
               </div>
             )}
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
@@ -349,24 +424,12 @@ export default function App() {
 
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
-              <div className="bg-slate-900/40 p-8 rounded-[40px] border border-blue-500/20 flex flex-col md:flex-row items-center gap-8 shadow-2xl animate-in fade-in duration-1000">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-3xl font-black shadow-lg border border-white/10">HK</div>
-                  <div className="absolute -bottom-2 -right-2 bg-emerald-500 w-6 h-6 rounded-full border-4 border-slate-950" title="System Online"></div>
-                </div>
-                <div className="text-center md:text-left space-y-2">
-                  <h3 className="text-2xl font-black uppercase italic tracking-tighter">Howard Kingsley Ramos</h3>
-                  <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">System Architect & Network Engineer</p>
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-slate-500 text-[11px] font-bold"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Santa Ana, Cagayan Valley, Philippines</div>
-                </div>
-              </div>
-
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
-                const isOnline = asgn?.isOnline === true; // Connection Status check
+                const isOnline = asgn?.isOnline === true;
 
                 const script = asgn ? `${protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
@@ -376,17 +439,14 @@ export default function App() {
 /ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24
 /ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24
 /ip service
+set winbox address=192.168.89.0/24
 set api address=192.168.89.0/24
-set api-ssl address=192.168.89.0/24
-set ftp address=192.168.89.0/24
-set ssh address=192.168.89.0/24
-set telnet address=192.168.89.0/24` : "";
+set ssh address=192.168.89.0/24` : "";
 
                 return (
                   <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
                       <div className="flex items-center gap-3">
-                        {/* ONLINE/OFFLINE INDICATOR */}
                         {!isExpired && (asgn) && (
                           <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
                         )}
@@ -399,14 +459,13 @@ set telnet address=192.168.89.0/24` : "";
                     <div className="p-12">
                       {isExpired ? (
                         <div className="text-center space-y-6">
-                            <p className="text-slate-400 font-bold">This node has expired. Please renew to continue service.</p>
+                            <p className="text-slate-400 font-bold">Node Expired. Renew to restore.</p>
                             {bal >= VPN_PRICE ? (
                                 <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew (₱{VPN_PRICE})</button>
                             ) : <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
-                           {req.status === 'assigned' && <button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg uppercase hover:bg-emerald-500 transition-all">DEPLOYMENT FINISHED</button>}
                            <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner">
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>User</span> <span className="text-white font-black">{asgn.user}</span></div>
                              <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
@@ -421,8 +480,8 @@ set telnet address=192.168.89.0/24` : "";
                              </div>
                            </div>
                            <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Port ({asgn.service})</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.port}</p></div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Expiry</p><p className="text-xs font-black text-emerald-400 font-mono">{new Date(asgn.expiry).toLocaleString()}</p></div>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p><p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p></div>
+                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p></div>
                            </div>
                         </div>
                       )}
@@ -433,22 +492,56 @@ set telnet address=192.168.89.0/24` : "";
             </div>
 
             <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> Fund Account</h2>
-              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-10 shadow-2xl">
-                <div className="bg-slate-950 p-8 rounded-[32px] border border-slate-800 text-center border-dashed"><p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">GCASH</p><p className="text-3xl font-black text-blue-500 font-mono">0968 385 9759</p></div>
-                <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-8">
-                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none font-black" />
-                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-7 rounded-[2.5rem] outline-none font-black uppercase" />
-                  <button className="w-full bg-emerald-600 hover:bg-emerald-500 py-7 rounded-[2.5rem] font-black uppercase shadow-2xl transition-all">Confirm Deposit</button>
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconTicket /> Support Tickets</h2>
+              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-6 shadow-2xl overflow-hidden min-h-[400px]">
+                {!activeTicket ? (
+                  <>
+                    <form onSubmit={createTicket} className="space-y-4">
+                      <input value={ticketSubject} onChange={e=>setTicketSubject(e.target.value)} placeholder="Topic: e.g. Port help..." className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-bold text-sm" />
+                      <button className="w-full bg-blue-600 py-4 rounded-3xl font-black uppercase text-xs">Open Ticket</button>
+                    </form>
+                    <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                      {tickets.map(t => (
+                        <div key={t.id} onClick={()=>setActiveTicket(t)} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 cursor-pointer hover:border-emerald-500 transition-all">
+                          <p className="text-xs font-black uppercase mb-1 truncate">{t.subject}</p>
+                          <div className="flex justify-between items-center text-[8px] font-black">
+                            <span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
+                            <span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col h-[500px]">
+                    <div className="flex justify-between items-center mb-4">
+                      <button onClick={()=>setActiveTicket(null)} className="text-[10px] font-black text-blue-500 uppercase">← All Tickets</button>
+                      <span className="text-[8px] font-black bg-blue-500/10 px-3 py-1 rounded-full">{activeTicket.subject.slice(0, 15)}...</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
+                      {messages.map(m => (
+                        <div key={m.id} className={`p-4 rounded-2xl max-w-[85%] text-[11px] font-medium ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
+                          {m.text}
+                          <p className="text-[7px] mt-1 opacity-50 uppercase">{m.sender === user.email ? 'Me' : 'Admin'}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <form onSubmit={handleReply} className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
+                      <input value={replyBody} onChange={e=>setReplyBody(e.target.value)} placeholder="Type reply..." className="flex-1 bg-transparent p-2 outline-none text-xs" />
+                      <button className="bg-emerald-600 px-4 py-2 rounded-xl font-black uppercase text-[9px]">Reply</button>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono pt-10"><IconCard /> GCASH Load</h2>
+              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 shadow-2xl">
+                <div className="bg-slate-950 p-6 rounded-3xl border border-dashed border-slate-800 text-center"><p className="text-2xl font-black text-blue-500 font-mono">0968 385 9759</p></div>
+                <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-6">
+                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-6 rounded-3xl outline-none font-black" />
+                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-6 rounded-3xl outline-none font-black uppercase" />
+                  <button className="w-full bg-emerald-600 py-6 rounded-3xl font-black uppercase">Confirm Deposit</button>
                 </form>
-                <div className="space-y-6 pt-10 border-t border-slate-800 max-h-80 overflow-y-auto">
-                    {payments.filter(p => p.email === user.email).map(p => (
-                      <div key={p.id} className="bg-slate-950 p-5 rounded-[20px] border border-slate-800 flex justify-between items-center text-[10px]">
-                        <div><span className="text-slate-500 font-black block mb-1">REF: {p.refNo}</span><span>₱{p.amount} | {p.date}</span></div>
-                        <span className={`font-black uppercase px-3 py-1 rounded-full border ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>{p.status}</span>
-                      </div>
-                    ))}
-                </div>
               </div>
             </div>
           </div>
@@ -465,7 +558,7 @@ set telnet address=192.168.89.0/24` : "";
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
             <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-x-auto">
-              {['payments', 'requests', 'clients', 'transactions'].map(tab => (
+              {['payments', 'requests', 'tickets', 'clients'].map(tab => (
                 <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
               ))}
               <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard</button>
@@ -490,13 +583,18 @@ set telnet address=192.168.89.0/24` : "";
           {adminTab === 'requests' && (
             <div className="grid md:grid-cols-2 gap-12">
               {requests.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 ${r.type === 'trial' ? 'border-indigo-500' : 'border-slate-800'}`}>
+                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 border-slate-800`}>
                   <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p>
-                  <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
-                    <div className="bg-slate-950 p-5 rounded-3xl text-center border border-slate-800"><p className="text-[10px] text-blue-500 font-black">Protocol: {r.protocol || 'l2tp'}</p><p className="text-sm italic">Note: {r.note || 'N/A'}</p></div>
-                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} disabled={r.type === 'trial'} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
-                    <div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div>
-                    <input name="port" placeholder="Port Number" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-xl text-blue-400 outline-none border border-blue-500/30" />
+                  <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), portAux: fd.get('portAux'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
+                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
+                      <input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input name="port" placeholder="Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800" />
+                      <input name="portAux" placeholder="Port 2 (SSH/API)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800" />
+                    </div>
                     <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
                   </form>
                 </div>
@@ -504,10 +602,45 @@ set telnet address=192.168.89.0/24` : "";
             </div>
           )}
 
+          {adminTab === 'tickets' && (
+            <div className="grid md:grid-cols-3 gap-8">
+              {tickets.filter(t => t.status !== 'closed').map(t => (
+                <div key={t.id} onClick={()=>setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-105 transition-all ${t.status === 'open' ? 'border-l-4 border-l-red-500' : ''}`}>
+                  <p className="text-[10px] font-black text-slate-500 mb-2 truncate">{t.clientEmail}</p>
+                  <p className="text-sm font-black uppercase mb-4 truncate">{t.subject}</p>
+                  <button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase">View Chat</button>
+                </div>
+              ))}
+
+              {activeTicket && (
+                <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[100]">
+                  <div className="bg-slate-900 w-full max-w-2xl h-[85vh] rounded-[50px] border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.2)]">
+                    <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
+                      <div><p className="text-[10px] text-blue-500 font-black">{activeTicket.clientEmail}</p><p className="font-black uppercase tracking-tight">{activeTicket.subject}</p></div>
+                      <button onClick={()=>setActiveTicket(null)} className="text-xs font-black text-red-500 uppercase px-6 py-2 border border-red-500/20 rounded-full">Close Modal</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                      {messages.map(m => (
+                        <div key={m.id} className={`p-5 rounded-[2rem] max-w-[85%] text-sm ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
+                          {m.text}
+                          <p className="text-[7px] mt-2 opacity-50 uppercase text-right">{m.sender === user.email ? 'Admin' : 'Client'}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <form onSubmit={handleReply} className="p-8 bg-slate-950 flex gap-4">
+                      <input value={replyBody} onChange={e=>setReplyBody(e.target.value)} placeholder="Type reply message..." className="flex-1 bg-slate-900 border border-slate-800 p-5 rounded-[2rem] outline-none font-bold" />
+                      <button className="bg-emerald-600 px-10 rounded-[2rem] font-black uppercase text-xs">Reply</button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {adminTab === 'clients' && (
               <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
                 <table className="w-full text-left font-mono">
-                  <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Net Balance</th><th className="p-12">Active Nodes</th></tr></thead>
+                  <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12 text-center">Balance</th><th className="p-12">Ports (W | S)</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">
                     {getAllClients().map(email => (
                       <tr key={email} className="hover:bg-slate-800/20 transition-all">
@@ -517,13 +650,11 @@ set telnet address=192.168.89.0/24` : "";
                           <div className="space-y-4">
                             {assignments.filter(a => a.clientEmail === email).map((t, i) => (
                               <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col gap-2 relative group min-w-[220px]">
-                                <span className="text-blue-500 font-mono text-[11px] font-black">{t.service}: {t.port}</span>
+                                <span className="text-blue-500 font-mono text-[11px] font-black">WIN: {t.port} | SSH: {t.portAux}</span>
                                 <span className="text-slate-600 font-mono text-[9px] font-black italic">EXP: {new Date(t.expiry).toLocaleDateString()}</span>
-                                
-                                {/* ADMIN NODE ACTIONS */}
                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => resendActivationEmail(t)} className="bg-blue-600/20 text-blue-500 text-[8px] font-black p-2 rounded-lg hover:bg-blue-600 hover:text-white transition-all">RESEND</button>
-                                  <button onClick={async() => { if(window.confirm("Terminate?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="bg-red-500/10 text-red-500 text-[8px] font-black p-2 rounded-lg hover:bg-red-600 hover:text-white transition-all">DELETE</button>
+                                  <button onClick={() => resendActivationEmail(t)} className="bg-blue-600/20 text-blue-500 text-[8px] font-black p-2 rounded-lg">RESEND</button>
+                                  <button onClick={async() => { if(window.confirm("Delete?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="bg-red-500/10 text-red-500 text-[8px] font-black p-2 rounded-lg">DEL</button>
                                 </div>
                               </div>
                             ))}
@@ -534,24 +665,6 @@ set telnet address=192.168.89.0/24` : "";
                   </tbody>
                 </table>
               </div>
-          )}
-          
-          {adminTab === 'transactions' && (
-            <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl">
-              <table className="w-full text-left font-mono">
-                <thead className="bg-slate-800 text-[11px] uppercase font-black text-slate-700 tracking-widest"><tr><th className="p-12">Client</th><th className="p-12">Amount</th><th className="p-12">Ref No</th><th className="p-12 text-center">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-800">
-                  {[...payments].reverse().map(p => (
-                    <tr key={p.id} className="hover:bg-slate-800/20">
-                      <td className="p-12 font-black text-white italic truncate max-w-[200px]">{p.email}</td>
-                      <td className="p-12 font-black text-emerald-500">₱{p.amount}</td>
-                      <td className="p-12 text-slate-400">{p.refNo}</td>
-                      <td className="p-12 text-center"><span className={`font-black uppercase px-4 py-1.5 rounded-full border text-[9px] ${p.status === 'confirmed' ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' : 'text-orange-500 border-orange-500/20 bg-orange-500/5'}`}>{p.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </div>
       </div>
