@@ -339,22 +339,43 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
   };
 
   const handleReply = async (e) => {
-    e.preventDefault();
-    if (!replyBody || !activeTicket) return;
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages'), {
+  e.preventDefault();
+  // Ensure we have a message and a ticket to reply to
+  if (!replyBody || !activeTicket) return;
+
+  try {
+    const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
+    const messagesCol = collection(ticketRef, 'messages');
+
+    // 1. Add message to Firestore
+    await addDoc(messagesCol, {
       sender: user.email,
       text: replyBody,
       timestamp: serverTimestamp()
     });
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id), {
+
+    // 2. Update Ticket Status and Timestamp
+    // If admin replies, status becomes 'answered'. If client replies, it stays/becomes 'open'.
+    await updateDoc(ticketRef, {
       lastUpdate: new Date().toISOString(),
       status: user.role === 'admin' ? 'answered' : 'open'
     });
+
+    // 3. Send Email Notification
+    const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
+    const subject = `New Reply: ${activeTicket.subject}`;
+    const body = `${user.name} sent a new message regarding your ticket.`;
     
-    const notifyTarget = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
-    sendEmail(notifyTarget, "New Ticket Reply", `New message: ${replyBody}`, activeTicket.id);
+    sendEmail(notifyEmail, subject, body, activeTicket.id);
+
+    // 4. Clear Input
     setReplyBody("");
-  };
+    console.log("Reply sent successfully.");
+  } catch (err) {
+    console.error("Error sending reply:", err);
+    alert("Failed to send reply. Please check your connection.");
+  }
+};
 
   const resendActivationEmail = (asgn) => {
     sendEmail(
