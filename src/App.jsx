@@ -484,30 +484,76 @@ set ssh address=192.168.89.0/24` : "";
                     <div className="p-12">
                       {isExpired ? (
                         <div className="text-center space-y-6">
-                            <p className="text-slate-400 font-bold">Node Expired. Renew to restore.</p>
-                            {bal >= VPN_PRICE ? (
-                                <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Renew (₱{VPN_PRICE})</button>
-                            ) : <p className="text-red-500 text-[10px] font-black uppercase">Insufficient Balance</p>}
+                          <p className="text-slate-400 font-bold italic">Node has expired. Please renew to continue service.</p>
+                          {bal >= VPN_PRICE ? (
+                            <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>
+                          ) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance for Renewal</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
-                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner">
-                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span>User</span> <span className="text-white font-black">{asgn.user}</span></div>
-                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span>Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
-                           </div>
-                           <div className="space-y-4">
-                             <p className="text-[10px] font-black text-blue-400 uppercase italic">MikroTik Script:</p>
-                             <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group">
-                                <pre className="whitespace-pre-wrap">{script}</pre>
-                                <button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all">
-                                  {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
-                                </button>
-                             </div>
-                           </div>
-                           <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p><p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p></div>
-                               <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p></div>
-                           </div>
+                          
+                          {/* 1. DEPLOYMENT BUTTON: Shows ONLY when status is 'assigned' */}
+                          {req.status === 'assigned' && (
+                            <button 
+                              onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} 
+                              className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 transition-all animate-bounce flex items-center justify-center gap-3"
+                            >
+                              <IconCheck /> FINISHED DEPLOYMENT
+                            </button>
+                          )}
+
+                          {/* 2. INSTRUCTIONS PANEL: Shows ONLY when status is 'active' */}
+                          {req.status === 'active' && (
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95 shadow-2xl">
+                              <div className="flex items-center gap-3 text-emerald-400">
+                                <IconShield />
+                                <h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3>
+                              </div>
+                              <p className="text-[13px] leading-relaxed text-slate-300 font-medium">
+                                Pwede mo nang i-remote ang iyong router gamit ang <strong>Winbox</strong> at <strong>API</strong> o <strong>SSH</strong> sa desktop o laptop, o <strong>MikroTik app</strong> sa cellphone. Gamitin lamang ang address at port na ito:
+                              </p>
+                              <div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner">
+                                <code className="text-emerald-400 font-black text-lg font-mono tracking-tighter">
+                                  remote.swifftnet.site:<span className="text-white underline">{asgn.port}</span>
+                                </code>
+                              </div>
+                              <div className="pt-4 border-t border-emerald-500/10 flex justify-between items-center">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Valid Until:</span>
+                                <span className="text-[10px] font-black text-white bg-slate-800 px-4 py-1.5 rounded-full border border-slate-700">
+                                    {new Date(asgn.expiry).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. CREDENTIALS BOX: Always visible for both statuses */}
+                          <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden">
+                            <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div>
+                            <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
+                          </div>
+
+                          {/* 4. MIKROTIK SCRIPT: Always visible */}
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p>
+                            <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl">
+                              <pre className="whitespace-pre-wrap">{script}</pre>
+                              <button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all border border-slate-700">
+                                {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 5. PORT SUMMARY FOOTER: Always visible */}
+                          <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
+                            <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl">
+                              <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p>
+                              <p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p>
+                            </div>
+                            <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl">
+                              <p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p>
+                              <p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
