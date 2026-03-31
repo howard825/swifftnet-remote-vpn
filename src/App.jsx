@@ -652,7 +652,7 @@ export default function App() {
     );
   }
 
-  // --- VIEW: PRIVACY POLICY ---
+
 // --- VIEW: PRIVACY POLICY ---
 if (view === 'privacy') {
   return (
