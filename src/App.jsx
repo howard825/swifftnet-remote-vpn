@@ -424,33 +424,49 @@ export default function App() {
   }
 
   // --- VIEW: LANDING ---
-  if (view === 'landing') {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
-        <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
-        <h1 className="text-5xl font-black mb-12 tracking-tighter uppercase italic text-center leading-none">SwifftNet <span className="text-blue-600">Remote</span></h1>
+  if (view === 'landing') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
+        <div className="text-blue-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
+        <h1 className="text-5xl font-black mb-12 tracking-tighter uppercase italic text-center leading-none">SwifftNet <span className="text-blue-600">Remote</span></h1>
+        
         <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-6">
-          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Join SwifftNet' : 'Login'}</h2>
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <input type="email" placeholder="Email" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
-            <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
-            
-            {/* NEW: FORGOT PASSWORD BUTTON */}
-            {!isSignUp && (
-              <div className="text-right px-2">
-                <button type="button" onClick={handleForgotPassword} className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500 transition-colors">Forgot Password?</button>
-              </div>
-            )}
-            
-            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
-          </form>
-          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
-          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Switch to Login' : 'Create Account'}</button>
-          {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{authError}</p>}
-        </div>
-      </div>
-    );
-  }
+          <h2 className="text-center text-xl font-black uppercase tracking-widest">{isSignUp ? 'Join SwifftNet' : 'Login'}</h2>
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            <input type="email" placeholder="Email" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
+            <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
+            
+            {!isSignUp && (
+              <div className="text-right px-2">
+                <button type="button" onClick={handleForgotPassword} className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500 transition-colors">Forgot Password?</button>
+              </div>
+            )}
+            
+            <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
+          </form>
+          <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
+          <button onClick={() => setIsSignUp(!isSignUp)} className="w-full text-blue-500 text-xs font-black uppercase underline tracking-widest">{isSignUp ? 'Switch to Login' : 'Create Account'}</button>
+          {authError && <p className="text-red-400 text-[10px] text-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{authError}</p>}
+        </div>
+
+        {/* --- UPDATED LEGAL FOOTER --- */}
+        <footer className="mt-12 flex gap-8">
+          <button 
+            onClick={() => setView('privacy')} 
+            className="text-slate-600 hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors"
+          >
+            Privacy Policy
+          </button>
+          <button 
+            onClick={() => setView('terms')} 
+            className="text-slate-600 hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors"
+          >
+            Terms of Use
+          </button>
+        </footer>
+      </div>
+    );
+  }
 
   // --- VIEW: DASHBOARD ---
   if (view === 'dashboard' && user) {
@@ -635,6 +651,165 @@ export default function App() {
       </div>
     );
   }
+
+  // --- VIEW: PRIVACY POLICY ---
+// --- VIEW: PRIVACY POLICY ---
+if (view === 'privacy') {
+  return (
+    <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
+      <div className="max-w-4xl w-full bg-slate-900/50 p-8 md:p-12 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
+        
+        <header className="border-b border-slate-800 pb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-black uppercase italic text-blue-500 leading-none">Privacy Policy</h1>
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">Last Updated: March 31, 2026</p>
+          </div>
+          <button 
+            onClick={() => setView('landing')} 
+            className="bg-slate-800 hover:bg-blue-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all"
+          >
+            Back
+          </button>
+        </header>
+
+        <div className="text-slate-300 text-sm space-y-6 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
+          <p>
+            This Privacy Policy outlines how <strong>SwifftNET</strong> (vpn.swifftnet.site) collects, uses, and protects your data. As a Philippine-based provider, we are committed to upholding the <strong>Data Privacy Act of 2012 (RA 10173)</strong>.
+          </p>
+
+          <section className="space-y-3">
+            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">1. Information We Collect</h2>
+            <div className="bg-black/30 p-5 rounded-2xl border border-slate-800">
+              <p className="mb-2 font-bold text-white uppercase text-xs">A. Account Information</p>
+              <ul className="list-disc ml-5 space-y-1 text-slate-400">
+                <li><strong>Personal Identity:</strong> Full Name, Contact Number, and Email Address.</li>
+                <li><strong>Billing Details:</strong> Records of payments and subscription status.</li>
+                <li><strong>Credentials:</strong> Username and encrypted passwords for VPN access.</li>
+              </ul>
+              <p className="mt-4 mb-2 font-bold text-white uppercase text-xs">B. Technical & Usage Logs</p>
+              <ul className="list-disc ml-5 space-y-1 text-slate-400">
+                <li><strong>Connection Metadata:</strong> Time of connection/disconnection and total bandwidth used.</li>
+                <li><strong>IP Addresses:</strong> Your assigned internal VPN IP and the public IP used to connect.</li>
+                <li><strong>Device Info:</strong> Basic identifiers of the device connecting to the server.</li>
+              </ul>
+              <p className="mt-4 italic text-xs text-blue-500/80">Note: We do NOT monitor, record, or store the specific websites you visit or the content of your communications.</p>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">2. Purpose of Data Processing</h2>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>Service Delivery:</strong> Authenticating your access and managing your remote connection.</li>
+              <li><strong>Security:</strong> Monitoring for unauthorized login attempts or network abuse.</li>
+              <li><strong>Support:</strong> Troubleshooting connectivity issues for your specific account.</li>
+              <li><strong>Legal Compliance:</strong> Adhering to Philippine laws, such as the Anti-Child Pornography Act (RA 9775).</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">3. Data Retention & Security</h2>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>Encryption:</strong> Secured using industry-standard protocols (WireGuard, OVPN, L2TP, or SSTP) with <strong>AES-256 bit encryption</strong>.</li>
+              <li><strong>Retention:</strong> Connection logs are automatically purged after <strong>60 days</strong> unless a longer period is legally mandated.</li>
+              <li><strong>Access Control:</strong> Access to our MikroTik/RouterOS backend is strictly limited to authorized SwifftNET administrators.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3 border-t border-slate-800 pt-6 text-center">
+            <h2 className="text-white font-black uppercase text-xs tracking-widest mb-2">Contact Our Data Protection Officer</h2>
+            <p className="text-blue-400 font-bold">ramoshowardkingsley58@gmail.com</p>
+            <p className="text-slate-500 text-[10px] uppercase font-black">Santa Ana Cagayan Valley | vpn.swifftnet.site</p>
+          </section>
+        </div>
+
+        <button 
+          onClick={() => setView('landing')} 
+          className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
+        >
+          Return to Login
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- VIEW: TERMS OF USE ---
+if (view === 'terms') {
+  return (
+    <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
+      <div className="max-w-4xl w-full bg-slate-900/50 p-8 md:p-12 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
+        
+        <header className="border-b border-slate-800 pb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-black uppercase italic text-emerald-500 leading-none">Terms of Use</h1>
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">Last Updated: March 31, 2026</p>
+          </div>
+          <button 
+            onClick={() => setView('landing')} 
+            className="bg-slate-800 hover:bg-emerald-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all"
+          >
+            Back
+          </button>
+        </header>
+
+        <div className="text-slate-300 text-sm space-y-6 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
+          <p className="italic text-slate-400">
+            This agreement governs your use of <strong>SwifftNET REMOTE Access</strong>. By using our services, you agree to be bound by these terms.
+          </p>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">1. Acceptance of Terms</h2>
+            <p>By subscribing, you acknowledge that you have read and agreed to these Terms. If using for a business, you represent that you have the authority to bind that entity.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">2. User Responsibilities & Conduct</h2>
+            <div className="bg-black/30 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <p className="font-bold text-white uppercase text-xs">Strictly Prohibited Activities:</p>
+              <ul className="list-disc ml-5 space-y-2 text-slate-400 text-xs">
+                <li><strong>Illegal Activity:</strong> Violations of the <strong>Cybercrime Prevention Act of 2012 (RA 10175)</strong>.</li>
+                <li><strong>Abuse:</strong> DDoS attacks, unauthorized access, or malware distribution.</li>
+                <li><strong>Reselling:</strong> Selling or transferring accounts without SwifftNET consent.</li>
+                <li><strong>Spamming:</strong> Using tunnels for unsolicited bulk emails or advertisements.</li>
+              </ul>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">3. Payment & Subscriptions</h2>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>Fees:</strong> Access is provided on a subscription basis at current listed rates.</li>
+              <li><strong>Refunds:</strong> Digital payments are generally <strong>non-refundable</strong>. Technical failures will be reviewed case-by-case.</li>
+              <li><strong>Late Payments:</strong> Unsettled renewals result in <strong>automatic suspension</strong> of the remote access tunnel.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">4. Service Level & Disclaimers</h2>
+            <p>Service is provided <strong>"As-Is."</strong> While we strive for 99.9% uptime, speeds may vary based on your local ISP (PLDT, Globe, Starlink, etc.) and network congestion.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">5. Termination & Liability</h2>
+            <p>SwifftNET reserves the right to terminate access immediately for breaches of these terms. We are not liable for indirect damages or data loss resulting from weak user security.</p>
+          </section>
+
+          <section className="space-y-3 border-t border-slate-800 pt-6 text-center">
+            <h2 className="text-white font-black uppercase text-xs tracking-widest mb-2">Governing Law</h2>
+            <p className="text-slate-500 text-[10px] uppercase font-black">Republic of the Philippines | Proper Courts of the Philippines</p>
+          </section>
+        </div>
+
+        <button 
+          onClick={() => setView('landing')} 
+          className="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+        >
+          I Accept - Return to Login
+        </button>
+      </div>
+    </div>
+  );
+}
 
   return null;
 }
