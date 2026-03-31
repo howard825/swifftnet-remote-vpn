@@ -9,7 +9,9 @@ import {
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendEmailVerification // <-- ADDED
+  sendEmailVerification,
+  sendPasswordResetEmail, // Added for Forgot Password
+  verifyBeforeUpdateEmail // Added for Change Email
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -68,6 +70,7 @@ const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconTelegram = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>;
 const IconTicket = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>;
+const IconEdit = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -123,29 +126,24 @@ export default function App() {
     else alert("Support widget is still loading.");
   };
 
-  // --- UPDATED EMAIL SENDER ---
-const sendEmail = (toEmail, subject, body, ticketId = "General") => {
-  const templateParams = { 
-    to_email: toEmail, 
-    subject: `[Ticket #${ticketId}] ${subject}`, 
-    message: body,
-    // Change 'your-registered-domain.com' to your actual domain
-    reply_to: `reply+${ticketId}@your-registered-domain.com` 
+  const sendEmail = (toEmail, subject, body, ticketId = "General") => {
+    const templateParams = { 
+      to_email: toEmail, 
+      subject: `[Ticket #${ticketId}] ${subject}`, 
+      message: body,
+      reply_to: `reply+${ticketId}@your-registered-domain.com` 
+    };
+    
+    emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY)
+      .then(() => console.log("Email Sent via SwifftNet Core"))
+      .catch((err) => console.error("Email Error:", err));
   };
-  
-  emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, templateParams, EJS_PUBLIC_KEY)
-    .then(() => console.log("Email Sent via SwifftNet Core"))
-    .catch((err) => console.error("Email Error:", err));
-};
 
-  // --- AUTH OBSERVER (UPDATED FOR VERIFICATION) ---
+  // --- AUTH OBSERVER ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
-        // Check if user is signed in via Google
         const isGoogleUser = fUser.providerData.some(p => p.providerId === 'google.com');
-        
-        // If Email user and NOT verified, force verification view
         if (!isGoogleUser && !fUser.emailVerified) {
           setView('verify-email');
         } else {
@@ -177,13 +175,11 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     onSnapshot(collection(db, ...base, 'requests'), (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     onSnapshot(collection(db, ...base, 'assignments'), (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // Support Ticket Listener
     const tCol = collection(db, ...base, 'tickets');
     const tQuery = user.role === 'admin' ? tCol : query(tCol, where('clientEmail', '==', user.email));
     onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
-  // Message Listener for active ticket
   useEffect(() => {
     if (!activeTicket || !db) return;
     const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages');
@@ -194,7 +190,6 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
   // --- AUTO-EXPIRY WATCHER ---
   useEffect(() => {
     if (user?.role !== 'admin' || !assignments.length) return;
-
     const checkExpirations = async () => {
       const now = new Date();
       for (const asgn of assignments) {
@@ -202,10 +197,8 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
         if (now > expiryDate && !asgn.expiryNotified) {
           sendEmail(asgn.clientEmail, "SwifftNet: Node Expired ⚠️", 
             `Your VPN node for port ${asgn.port} has expired. Please top up your account to restore service.`);
-          
           sendEmail(ADMIN_EMAIL, `Alert: Node Expired (${asgn.clientEmail})`, 
             `User ${asgn.clientEmail} has an expired port (${asgn.port}).`);
-
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
             expiryNotified: true
           });
@@ -218,27 +211,50 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
   // --- AUTO-OFFLINE LOGIC ---
   useEffect(() => {
     if (user?.role !== 'admin' || !assignments.length) return;
-
     const interval = setInterval(() => {
       assignments.forEach(async (asgn) => {
         if (asgn.isOnline && asgn.lastSeen) {
           const lastSeenDate = new Date(asgn.lastSeen.seconds * 1000);
           const secondsSinceLastPing = (new Date() - lastSeenDate) / 1000;
-          
           if (secondsSinceLastPing > 180) { 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
-              isOnline: false
-            });
-            console.log(`Node ${asgn.port} timed out and marked offline.`);
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), { isOnline: false });
           }
         }
       });
     }, 60000); 
-
     return () => clearInterval(interval); 
   }, [assignments, user]);
 
-  // --- HANDLERS ---
+  // --- NEW FEATURES HANDLERS ---
+  const handleForgotPassword = async () => {
+    if (!emailInput) {
+      alert("Please enter your email in the field first.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, emailInput);
+      alert(`A password reset link has been sent to ${emailInput}.`);
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    const newEmail = prompt("Enter your new email address:");
+    if (!newEmail || newEmail === user.email) return;
+
+    try {
+      // Sends a verification link to the NEW email.
+      // The update only completes once the user verifies.
+      await verifyBeforeUpdateEmail(auth.currentUser, newEmail);
+      alert(`A verification link has been sent to ${newEmail}. Please verify it and then log back in.`);
+      handleLogout();
+    } catch (err) {
+      alert(`Failed to update email: ${err.message}. You might need to sign in again to perform this sensitive action.`);
+    }
+  };
+
+  // --- BASE HANDLERS ---
   const getUserBalance = (email) => {
     const deposits = payments
       .filter(p => p.email === email && p.status === 'confirmed')
@@ -249,14 +265,12 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
 
   const getAllClients = () => Array.from(new Set([...payments.map(p => p.email), ...requests.map(r => r.email)]));
 
-  // --- UPDATED EMAIL AUTH HANDLER ---
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setAuthError(null);
     try {
       if (isSignUp) {
         const userCred = await createUserWithEmailAndPassword(auth, emailInput, passInput);
-        // Send Verification Email immediately on Signup
         await sendEmailVerification(userCred.user);
         alert("A verification email has been sent. Please check your inbox before logging in.");
       } else {
@@ -340,7 +354,6 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
       createdAt: new Date().toISOString(),
       lastUpdate: new Date().toISOString()
     });
-    sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`, tRef.id);
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets', tRef.id, 'messages'), {
       sender: user.email,
       text: `Support Request: ${ticketSubject}`,
@@ -351,31 +364,29 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
   };
 
   const handleReply = async (e) => {
-  e.preventDefault();
-  if (!replyBody || !activeTicket) return;
+    e.preventDefault();
+    if (!replyBody || !activeTicket) return;
 
-  try {
-    const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
-    const messagesCol = collection(ticketRef, 'messages');
+    try {
+      const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
+      await addDoc(collection(ticketRef, 'messages'), {
+        sender: user.email,
+        text: replyBody,
+        timestamp: serverTimestamp()
+      });
 
-    await addDoc(messagesCol, {
-      sender: user.email,
-      text: replyBody,
-      timestamp: serverTimestamp()
-    });
+      await updateDoc(ticketRef, {
+        lastUpdate: new Date().toISOString(),
+        status: user.role === 'admin' ? 'answered' : 'open'
+      });
 
-    await updateDoc(ticketRef, {
-      lastUpdate: new Date().toISOString(),
-      status: user.role === 'admin' ? 'answered' : 'open'
-    });
-
-    const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
-    sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
-    setReplyBody("");
-  } catch (err) {
-    alert(`Failed to send reply: ${err.message}`);
-  }
-};
+      const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
+      sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
+      setReplyBody("");
+    } catch (err) {
+      alert(`Failed to send reply: ${err.message}`);
+    }
+  };
 
   const resendActivationEmail = (asgn) => {
     sendEmail(
@@ -392,37 +403,27 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
+  if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest text-sm">INITIALIZING SWIFFTNET CORE...</div>;
 
-  // --- NEW: EMAIL VERIFICATION VIEW ---
+  // --- VIEW: VERIFY EMAIL ---
   if (view === 'verify-email') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
         <div className="text-orange-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
         <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-orange-500/20 shadow-2xl text-center space-y-6">
-          <h2 className="text-2xl font-black uppercase tracking-widest italic">Verify Your Identity</h2>
-          <p className="text-slate-400 font-medium text-sm">We've sent a verification link to your email. Please click the link to activate your SwifftNet account.</p>
+          <h2 className="text-2xl font-black uppercase tracking-widest italic">Verify Identity</h2>
+          <p className="text-slate-400 font-medium text-sm">Check your inbox for the activation link to start using SwifftNet.</p>
           <div className="bg-black/40 p-4 rounded-2xl border border-slate-800">
             <code className="text-blue-400 text-xs font-bold">{auth.currentUser?.email}</code>
           </div>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl transition-all"
-          >
-            I have Verified
-          </button>
-          <button 
-            onClick={handleLogout} 
-            className="w-full text-slate-500 text-[10px] font-black uppercase underline tracking-widest"
-          >
-            Logout & Try Again
-          </button>
+          <button onClick={() => window.location.reload()} className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase shadow-xl transition-all">I have Verified</button>
+          <button onClick={handleLogout} className="w-full text-slate-500 text-[10px] font-black uppercase underline tracking-widest">Logout & Try Again</button>
         </div>
       </div>
     );
   }
 
-  // --- LANDING VIEW ---
+  // --- VIEW: LANDING ---
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
@@ -433,6 +434,14 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <input type="email" placeholder="Email" required value={emailInput} onChange={(e)=>setEmailInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
             <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
+            
+            {/* NEW: FORGOT PASSWORD BUTTON */}
+            {!isSignUp && (
+              <div className="text-right px-2">
+                <button type="button" onClick={handleForgotPassword} className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500 transition-colors">Forgot Password?</button>
+              </div>
+            )}
+            
             <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl">{isSignUp ? 'Register' : 'Login'}</button>
           </form>
           <button onClick={handleGoogleLogin} className="w-full bg-white text-slate-900 py-5 rounded-3xl font-black flex items-center justify-center gap-4 uppercase tracking-widest"><IconGoogle /> Google Login</button>
@@ -443,7 +452,7 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     );
   }
 
-  // --- CLIENT DASHBOARD ---
+  // --- VIEW: DASHBOARD ---
   if (view === 'dashboard' && user) {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
@@ -456,7 +465,14 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
           <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6 shadow-xl">
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl uppercase border-4 border-blue-600">{user.name[0]}</div>
-              <div><h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1><p className="text-xs text-slate-500 font-bold uppercase mt-2">{user.email}</p></div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1>
+                <div className="flex items-center gap-2 mt-2">
+                  <p className="text-xs text-slate-500 font-bold uppercase">{user.email}</p>
+                  {/* NEW: CHANGE EMAIL BUTTON */}
+                  <button onClick={handleUpdateEmail} className="text-slate-700 hover:text-blue-500 transition-colors" title="Change Email"><IconEdit /></button>
+                </div>
+              </div>
             </div>
             <div className="flex gap-4">
                <button onClick={openSupport} className="flex items-center gap-2 bg-slate-800 hover:bg-blue-600 text-white font-black text-[10px] uppercase px-6 py-3 rounded-2xl transition-all border border-slate-700"><IconTelegram /> Support</button>
@@ -505,105 +521,31 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 const isOnline = asgn?.isOnline === true;
-
-                const script = asgn ? `${protocol === 'l2tp' 
-                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
-                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`
-                }
-/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24
-/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24
-/ip service
-set winbox address=192.168.89.0/24
-set api address=192.168.89.0/24
-set ssh address=192.168.89.0/24` : "";
-
+                const script = asgn ? `${protocol === 'l2tp' ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes` : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`}\n/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24\n/ip service\nset winbox address=192.168.89.0/24\nset api address=192.168.89.0/24\nset ssh address=192.168.89.0/24` : "";
                 return (
                   <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
                     <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
                       <div className="flex items-center gap-3">
-                        {!isExpired && (asgn) && (
-                          <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
-                        )}
+                        {!isExpired && (asgn) && (<div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />)}
                         <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500 border-red-500/20' : isOnline ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
                         {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
                       </span>
                     </div>
                     <div className="p-12">
                       {isExpired ? (
                         <div className="text-center space-y-6">
-                          <p className="text-slate-400 font-bold italic">Node has expired. Please renew to continue service.</p>
-                          {bal >= VPN_PRICE ? (
-                            <button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>
-                          ) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance for Renewal</p>}
+                          <p className="text-slate-400 font-bold italic">Node has expired. Please renew.</p>
+                          {bal >= VPN_PRICE ? (<button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
-                          
-                          {/* 1. DEPLOYMENT BUTTON */}
-                          {req.status === 'assigned' && (
-                            <button 
-                              onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} 
-                              className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 transition-all animate-bounce flex items-center justify-center gap-3"
-                            >
-                              <IconCheck /> FINISHED DEPLOYMENT
-                            </button>
-                          )}
-
-                          {/* 2. INSTRUCTIONS PANEL */}
-                          {req.status === 'active' && (
-                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95 shadow-2xl">
-                              <div className="flex items-center gap-3 text-emerald-400">
-                                <IconShield />
-                                <h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3>
-                              </div>
-                              <p className="text-[13px] leading-relaxed text-slate-300 font-medium">
-                                Pwede mo nang i-remote ang iyong router gamit ang <strong>Winbox</strong> at <strong>API</strong> o <strong>SSH</strong> sa desktop o laptop, o <strong>MikroTik app</strong> sa cellphone. Gamitin lamang ang address at port na ito:
-                              </p>
-                              <div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner">
-                                <code className="text-emerald-400 font-black text-lg font-mono tracking-tighter">
-                                  remote.swifftnet.site:<span className="text-white underline"> check ports below </span>
-                                </code>
-                              </div>
-                              <div className="pt-4 border-t border-emerald-500/10 flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Valid Until:</span>
-                                <span className="text-[10px] font-black text-white bg-slate-800 px-4 py-1.5 rounded-full border border-slate-700">
-                                    {new Date(asgn.expiry).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 3. CREDENTIALS BOX */}
-                          <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden">
-                            <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div>
-                            <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
-                          </div>
-
-                          {/* 4. MIKROTIK SCRIPT */}
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p>
-                            <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl">
-                              <pre className="whitespace-pre-wrap">{script}</pre>
-                              <button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-all border border-slate-700">
-                                {copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* 5. PORT SUMMARY FOOTER */}
-                          <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
-                            <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl">
-                              <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p>
-                              <p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p>
-                            </div>
-                            <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl">
-                              <p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p>
-                              <p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p>
-                            </div>
-                          </div>
+                          {req.status === 'assigned' && (<button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 animate-bounce flex items-center justify-center gap-3"><IconCheck /> FINISHED DEPLOYMENT</button>)}
+                          {req.status === 'active' && (<div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95"><div className="flex items-center gap-3 text-emerald-400"><IconShield /><h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3></div><p className="text-[13px] leading-relaxed text-slate-300 font-medium">Use <strong>Winbox</strong> or <strong>SSH</strong> to access your router.</p><div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner"><code className="text-emerald-400 font-black text-lg font-mono">remote.swifftnet.site</code></div></div>)}
+                          <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden"><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div></div>
+                          <div className="space-y-4"><p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p><div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl"><pre className="whitespace-pre-wrap">{script}</pre><button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 border border-slate-700">{copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}</button></div></div>
+                          <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800"><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p><p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p></div><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p></div></div>
                         </div>
                       )}
                     </div>
@@ -625,32 +567,16 @@ set ssh address=192.168.89.0/24` : "";
                       {tickets.map(t => (
                         <div key={t.id} onClick={()=>setActiveTicket(t)} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 cursor-pointer hover:border-emerald-500 transition-all">
                           <p className="text-xs font-black uppercase mb-1 truncate">{t.subject}</p>
-                          <div className="flex justify-between items-center text-[8px] font-black">
-                            <span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
-                            <span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span>
-                          </div>
+                          <div className="flex justify-between items-center text-[8px] font-black"><span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span><span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span></div>
                         </div>
                       ))}
                     </div>
                   </>
                 ) : (
                   <div className="flex flex-col h-[500px]">
-                    <div className="flex justify-between items-center mb-4">
-                      <button onClick={()=>setActiveTicket(null)} className="text-[10px] font-black text-blue-500 uppercase">← All Tickets</button>
-                      <span className="text-[8px] font-black bg-blue-500/10 px-3 py-1 rounded-full">{activeTicket.subject.slice(0, 15)}...</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
-                      {messages.map(m => (
-                        <div key={m.id} className={`p-4 rounded-2xl max-w-[85%] text-[11px] font-medium ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
-                          {m.text}
-                          <p className="text-[7px] mt-1 opacity-50 uppercase">{m.sender === user.email ? 'Me' : 'Admin'}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <form onSubmit={handleReply} className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                      <input value={replyBody} onChange={e=>setReplyBody(e.target.value)} placeholder="Type reply..." className="flex-1 bg-transparent p-2 outline-none text-xs" />
-                      <button className="bg-emerald-600 px-4 py-2 rounded-xl font-black uppercase text-[9px]">Reply</button>
-                    </form>
+                    <div className="flex justify-between items-center mb-4"><button onClick={()=>setActiveTicket(null)} className="text-[10px] font-black text-blue-500 uppercase">← All Tickets</button><span className="text-[8px] font-black bg-blue-500/10 px-3 py-1 rounded-full">{activeTicket.subject.slice(0, 15)}...</span></div>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">{messages.map(m => (<div key={m.id} className={`p-4 rounded-2xl max-w-[85%] text-[11px] font-medium ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>{m.text}<p className="text-[7px] mt-1 opacity-50 uppercase">{m.sender === user.email ? 'Me' : 'Admin'}</p></div>))}</div>
+                    <form onSubmit={handleReply} className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800"><input value={replyBody} onChange={e=>setReplyBody(e.target.value)} placeholder="Type reply..." className="flex-1 bg-transparent p-2 outline-none text-xs" /><button className="bg-emerald-600 px-4 py-2 rounded-xl font-black uppercase text-[9px]">Reply</button></form>
                   </div>
                 )}
               </div>
@@ -671,7 +597,7 @@ set ssh address=192.168.89.0/24` : "";
     );
   }
 
-  // --- ADMIN TERMINAL ---
+  // --- VIEW: ADMIN ---
   if (view === 'admin' && user) {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
@@ -679,221 +605,36 @@ set ssh address=192.168.89.0/24` : "";
           <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
             <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
             <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-x-auto">
-              {['payments', 'requests', 'tickets', 'clients'].map(tab => (
-                <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
-              ))}
+              {['payments', 'requests', 'tickets', 'clients'].map(tab => (<button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>))}
               <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard</button>
             </div>
           </header>
 
-          {adminTab === 'payments' && (
-            <div className="grid md:grid-cols-3 gap-10">
-              {payments.filter(p => p.status === 'pending').map(p => (
-                <div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95">
-                  <p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p>
-                  <div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div>
-                  <div className="flex gap-4">
-                    <button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button>
-                    <button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {adminTab === 'requests' && (
-            <div className="grid md:grid-cols-2 gap-12">
-              {requests.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 border-slate-800`}>
-                  <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p>
-                  <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), portAux: fd.get('portAux'), service: r.service || 'winbox' }, r.type); }} className="space-y-6">
-                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
-                      <input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <input name="port" placeholder="Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800" />
-                      <input name="portAux" placeholder="Port 2 (SSH/API)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800" />
-                    </div>
-                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button>
-                  </form>
-                </div>
-              ))}
-            </div>
-          )}
-
+          {adminTab === 'payments' && (<div className="grid md:grid-cols-3 gap-10">{payments.filter(p => p.status === 'pending').map(p => (<div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95"><p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p><div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div><div className="flex gap-4"><button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button><button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button></div></div>))}</div>)}
+          {adminTab === 'requests' && (<div className="grid md:grid-cols-2 gap-12">{requests.filter(r => r.status === 'pending').map(r => (<div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 border-slate-800`}><p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p><form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), portAux: fd.get('portAux'), service: r.service || 'winbox' }, r.type); }} className="space-y-6"><input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" /><div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div><div className="grid grid-cols-2 gap-4"><input name="port" placeholder="Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800" /><input name="portAux" placeholder="Port 2 (SSH/API)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800" /></div><button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button></form></div>))}</div>)}
           {adminTab === 'tickets' && (
             <div className="grid md:grid-cols-3 gap-8">
               {tickets.filter(t => t.status !== 'closed').sort((a,b) => new Date(b.lastUpdate) - new Date(a.lastUpdate)).map(t => (
-                <div key={t.id} onClick={() => setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group ${t.status === 'open' ? 'border-l-4 border-l-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]' : 'border-l-4 border-l-emerald-500'}`}>
-                  <p className="text-[10px] font-black text-blue-500 mb-2 truncate uppercase tracking-widest">{t.clientEmail}</p>
-                  <p className="text-sm font-black uppercase mb-4 truncate italic">{t.subject}</p>
-                  <div className="flex justify-between items-center text-[9px] font-black text-slate-500">
-                    <span>LAST: {new Date(t.lastUpdate).toLocaleTimeString()}</span>
-                    <span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
-                  </div>
-                  <button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase mt-6 group-hover:bg-blue-500 transition-colors">Open Conversation</button>
-                </div>
+                <div key={t.id} onClick={() => setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group ${t.status === 'open' ? 'border-l-4 border-l-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]' : 'border-l-4 border-l-emerald-500'}`}><p className="text-[10px] font-black text-blue-500 mb-2 truncate uppercase tracking-widest">{t.clientEmail}</p><p className="text-sm font-black uppercase mb-4 truncate italic">{t.subject}</p><div className="flex justify-between items-center text-[9px] font-black text-slate-500"><span>LAST: {new Date(t.lastUpdate).toLocaleTimeString()}</span><span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{t.status.toUpperCase()}</span></div><button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase mt-6 group-hover:bg-blue-500 transition-colors">Open Conversation</button></div>
               ))}
-
               {activeTicket && (
                 <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 md:p-10 z-[100] animate-in fade-in duration-300">
                   <div className="bg-slate-900 w-full max-w-3xl h-[90vh] rounded-[50px] border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_60px_rgba(37,99,235,0.2)]">
-                    <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {activeTicket.id.slice(-6)}</p>
-                        <h2 className="font-black uppercase tracking-tight text-lg italic">{activeTicket.subject}</h2>
-                        <p className="text-[9px] text-slate-500 font-bold">{activeTicket.clientEmail}</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <button 
-                            onClick={async () => {
-                              if(window.confirm("Close this ticket? Client will be notified.")) {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id), { status: 'closed', lastUpdate: new Date().toISOString() });
-                                sendEmail(activeTicket.clientEmail, "Ticket Closed ✅", `Your support ticket regarding "${activeTicket.subject}" has been marked as resolved.`);
-                                setActiveTicket(null);
-                              }
-                            }}
-                            className="px-6 py-2 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-full hover:bg-red-500 hover:text-white transition-all"
-                        >
-                            Close Ticket
-                        </button>
-                        <button onClick={() => setActiveTicket(null)} className="text-xs font-black text-slate-500 uppercase px-4 py-2 bg-slate-800 rounded-full hover:bg-slate-700">Back</button>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]">
-                      {messages.map(m => (
-                        <div key={m.id} className={`flex flex-col ${m.sender === user.email ? 'items-end' : 'items-start'}`}>
-                          <div className={`p-5 rounded-[2rem] max-w-[85%] text-sm font-medium shadow-xl ${m.sender === user.email ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none'}`}>
-                            {m.text}
-                          </div>
-                          <p className="text-[8px] mt-2 opacity-40 uppercase font-black tracking-widest px-2">{m.sender === user.email ? 'Admin (You)' : 'Client Response'}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <form onSubmit={handleReply} className="p-8 bg-slate-950 border-t border-slate-800 flex gap-4">
-                      <input 
-                        value={replyBody} 
-                        onChange={e => setReplyBody(e.target.value)} 
-                        placeholder="Type your official response..." 
-                        className="flex-1 bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] outline-none font-bold text-sm focus:border-blue-500 transition-all" 
-                      />
-                      <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-10 rounded-[2.5rem] font-black uppercase text-xs shadow-lg transition-all flex items-center gap-2">
-                        Send Reply
-                      </button>
-                    </form>
+                    <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50"><div className="space-y-1"><p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {activeTicket.id.slice(-6)}</p><h2 className="font-black uppercase tracking-tight text-lg italic">{activeTicket.subject}</h2><p className="text-[9px] text-slate-500 font-bold">{activeTicket.clientEmail}</p></div><div className="flex gap-4"><button onClick={async () => { if(window.confirm("Close this ticket? Client will be notified.")) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id), { status: 'closed', lastUpdate: new Date().toISOString() }); sendEmail(activeTicket.clientEmail, "Ticket Closed ✅", `Your support ticket regarding "${activeTicket.subject}" has been marked as resolved.`); setActiveTicket(null); } }} className="px-6 py-2 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-full hover:bg-red-500 hover:text-white transition-all">Close Ticket</button><button onClick={() => setActiveTicket(null)} className="text-xs font-black text-slate-500 uppercase px-4 py-2 bg-slate-800 rounded-full hover:bg-slate-700">Back</button></div></div>
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]">{messages.map(m => (<div key={m.id} className={`flex flex-col ${m.sender === user.email ? 'items-end' : 'items-start'}`}><div className={`p-5 rounded-[2rem] max-w-[85%] text-sm font-medium shadow-xl ${m.sender === user.email ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none'}`}>{m.text}</div><p className="text-[8px] mt-2 opacity-40 uppercase font-black tracking-widest px-2">{m.sender === user.email ? 'Admin (You)' : 'Client Response'}</p></div>))}</div>
+                    <form onSubmit={handleReply} className="p-8 bg-slate-950 border-t border-slate-800 flex gap-4"><input value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder="Type your official response..." className="flex-1 bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] outline-none font-bold text-sm focus:border-blue-500 transition-all" /><button type="submit" className="bg-blue-600 hover:bg-blue-500 px-10 rounded-[2.5rem] font-black uppercase text-xs shadow-lg transition-all flex items-center gap-2">Send Reply</button></form>
                   </div>
                 </div>
               )}
             </div>
           )}
-
           {adminTab === 'clients' && (
-          <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in duration-500">
-            <table className="w-full text-left font-mono">
-              <thead className="bg-slate-800/50 text-[11px] uppercase font-black text-slate-500 tracking-widest border-b border-slate-800">
-                <tr>
-                  <th className="p-10">Client Profile</th>
-                  <th className="p-10 text-center">Net Balance</th>
-                  <th className="p-10">Network Nodes (Ports & Status)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {getAllClients().map(email => (
-                  <tr key={email} className="hover:bg-slate-800/20 transition-all group">
-                    <td className="p-10 align-top">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-black text-white italic truncate max-w-[250px] text-sm group-hover:text-blue-400 transition-colors">
-                          {email}
-                        </span>
-                        <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">
-                          Verified SwifftNet User
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-10 text-center align-top">
-                      <div className="bg-slate-950/50 inline-block px-6 py-3 rounded-2xl border border-slate-800">
-                        <p className="text-2xl font-black text-emerald-500">₱{getUserBalance(email)}</p>
-                        <p className="text-[8px] text-slate-600 font-black uppercase">Available Credits</p>
-                      </div>
-                    </td>
-                    <td className="p-10 align-top">
-                      <div className="space-y-4">
-                        {assignments.filter(a => a.clientEmail === email).length > 0 ? (
-                          assignments.filter(a => a.clientEmail === email).map((t, i) => (
-                            <div 
-                              key={i} 
-                              className={`bg-slate-950 p-5 rounded-3xl border transition-all relative group/node min-w-[280px] shadow-lg ${
-                                t.isOnline 
-                                ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
-                                : 'border-slate-800'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex flex-col">
-                                  <span className="text-blue-400 font-mono text-[11px] font-black uppercase leading-none">
-                                    Winbox: <span className="text-white">{t.port}</span>
-                                  </span>
-                                  <span className="text-blue-600 font-mono text-[11px] font-black uppercase mt-1">
-                                    SSH/API: <span className="text-white">{t.portAux || 'N/A'}</span>
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-end gap-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>
-                                      {t.isOnline ? 'Active' : 'Offline'}
-                                    </span>
-                                    <div className={`w-2 h-2 rounded-full ${t.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-700'}`} />
-                                  </div>
-                                  {t.lastSeen && (
-                                    <span className="text-[7px] text-slate-700 font-black uppercase">
-                                      Ping: {new Date(t.lastSeen.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="flex justify-between items-center pt-3 border-t border-slate-900">
-                                <span className="text-slate-600 font-mono text-[9px] font-black italic uppercase">
-                                  Exp: {new Date(t.expiry).toLocaleDateString()}
-                                </span>
-                                <div className="flex items-center gap-2 opacity-0 group-hover/node:opacity-100 transition-opacity">
-                                  <button 
-                                    onClick={() => resendActivationEmail(t)} 
-                                    className="bg-blue-600/10 text-blue-500 text-[8px] font-black px-3 py-1.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all border border-blue-500/20"
-                                  >
-                                    RESEND
-                                  </button>
-                                  <button 
-                                    onClick={async() => { 
-                                      if(window.confirm(`Terminate node ${t.port} for ${email}?`)) 
-                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); 
-                                    }} 
-                                    className="bg-red-500/10 text-red-500 text-[8px] font-black px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-500/20"
-                                  >
-                                    DELETE
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-slate-700 font-black uppercase italic">No Active Nodes Found</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+            <div className="bg-slate-900 rounded-[60px] border border-slate-800 overflow-hidden shadow-2xl animate-in fade-in duration-500"><table className="w-full text-left font-mono"><thead className="bg-slate-800/50 text-[11px] uppercase font-black text-slate-500 tracking-widest border-b border-slate-800"><tr><th className="p-10">Client Profile</th><th className="p-10 text-center">Net Balance</th><th className="p-10">Network Nodes</th></tr></thead><tbody className="divide-y divide-slate-800/50">{getAllClients().map(email => (<tr key={email} className="hover:bg-slate-800/20 transition-all group"><td className="p-10 align-top"><div className="flex flex-col gap-1"><span className="font-black text-white italic truncate max-w-[250px] text-sm group-hover:text-blue-400 transition-colors">{email}</span><span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Verified SwifftNet User</span></div></td><td className="p-10 text-center align-top"><div className="bg-slate-950/50 inline-block px-6 py-3 rounded-2xl border border-slate-800"><p className="text-2xl font-black text-emerald-500">₱{getUserBalance(email)}</p><p className="text-[8px] text-slate-600 font-black uppercase">Credits</p></div></td><td className="p-10 align-top"><div className="space-y-4">{assignments.filter(a => a.clientEmail === email).length > 0 ? (assignments.filter(a => a.clientEmail === email).map((t, i) => (<div key={i} className={`bg-slate-950 p-5 rounded-3xl border transition-all relative group/node min-w-[280px] shadow-lg ${t.isOnline ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.05)]' : 'border-slate-800'}`}><div className="flex justify-between items-start mb-3"><div className="flex flex-col"><span className="text-blue-400 font-mono text-[11px] font-black uppercase leading-none">Winbox: <span className="text-white">{t.port}</span></span><span className="text-blue-600 font-mono text-[11px] font-black uppercase mt-1">SSH/API: <span className="text-white">{t.portAux || 'N/A'}</span></span></div><div className="flex flex-col items-end gap-1"><div className="flex items-center gap-2"><span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>{t.isOnline ? 'Active' : 'Offline'}</span><div className={`w-2 h-2 rounded-full ${t.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-700'}`} /></div></div></div><div className="flex justify-between items-center pt-3 border-t border-slate-900"><span className="text-slate-600 font-mono text-[9px] font-black italic uppercase">Exp: {new Date(t.expiry).toLocaleDateString()}</span><div className="flex items-center gap-2 opacity-0 group-hover/node:opacity-100 transition-opacity"><button onClick={() => resendActivationEmail(t)} className="bg-blue-600/10 text-blue-500 text-[8px] font-black px-3 py-1.5 rounded-lg border border-blue-500/20">RESEND</button><button onClick={async() => { if(window.confirm(`Terminate node ${t.port}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', t.id)); }} className="bg-red-500/10 text-red-500 text-[8px] font-black px-3 py-1.5 rounded-lg border border-red-500/20">DELETE</button></div></div></div>))) : (<span className="text-[10px] text-slate-700 font-black uppercase italic">No Active Nodes</span>)}</div></td></tr>))}</tbody></table></div>
+          )}
         </div>
       </div>
     );
   }
+
   return null;
 }
