@@ -8,7 +8,8 @@ import {
   onAuthStateChanged, 
   signOut,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
+  sendEmailVerification // <-- ADDED
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -137,19 +138,27 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     .catch((err) => console.error("Email Error:", err));
 };
 
-  // --- AUTH OBSERVER ---
+  // --- AUTH OBSERVER (UPDATED FOR VERIFICATION) ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
-        const role = fUser.email === ADMIN_EMAIL ? 'admin' : 'client';
-        setUser({
-          uid: fUser.uid,
-          name: fUser.displayName || fUser.email.split('@')[0],
-          email: fUser.email,
-          role: role,
-          createdAt: fUser.metadata.creationTime,
-        });
-        setView(role === 'admin' ? 'admin' : 'dashboard');
+        // Check if user is signed in via Google
+        const isGoogleUser = fUser.providerData.some(p => p.providerId === 'google.com');
+        
+        // If Email user and NOT verified, force verification view
+        if (!isGoogleUser && !fUser.emailVerified) {
+          setView('verify-email');
+        } else {
+          const role = fUser.email === ADMIN_EMAIL ? 'admin' : 'client';
+          setUser({
+            uid: fUser.uid,
+            name: fUser.displayName || fUser.email.split('@')[0],
+            email: fUser.email,
+            role: role,
+            createdAt: fUser.metadata.creationTime,
+          });
+          setView(role === 'admin' ? 'admin' : 'dashboard');
+        }
       } else {
         setUser(null);
         setView('landing');
@@ -206,19 +215,17 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     checkExpirations();
   }, [assignments, user]);
 
-  // --- ADD THE AUTO-OFFLINE LOGIC HERE ---
+  // --- AUTO-OFFLINE LOGIC ---
   useEffect(() => {
-    // Only the admin needs to run this "cleaner" logic to update the DB
     if (user?.role !== 'admin' || !assignments.length) return;
 
     const interval = setInterval(() => {
       assignments.forEach(async (asgn) => {
-        // If node is marked online but we haven't heard from it in 3 minutes
         if (asgn.isOnline && asgn.lastSeen) {
           const lastSeenDate = new Date(asgn.lastSeen.seconds * 1000);
           const secondsSinceLastPing = (new Date() - lastSeenDate) / 1000;
           
-          if (secondsSinceLastPing > 180) { // 180 seconds = 3 minutes
+          if (secondsSinceLastPing > 180) { 
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id), {
               isOnline: false
             });
@@ -226,9 +233,9 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
           }
         }
       });
-    }, 60000); // Check every 60 seconds
+    }, 60000); 
 
-    return () => clearInterval(interval); // Cleanup on logout/close
+    return () => clearInterval(interval); 
   }, [assignments, user]);
 
   // --- HANDLERS ---
@@ -242,12 +249,19 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
 
   const getAllClients = () => Array.from(new Set([...payments.map(p => p.email), ...requests.map(r => r.email)]));
 
+  // --- UPDATED EMAIL AUTH HANDLER ---
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setAuthError(null);
     try {
-      if (isSignUp) await createUserWithEmailAndPassword(auth, emailInput, passInput);
-      else await signInWithEmailAndPassword(auth, emailInput, passInput);
+      if (isSignUp) {
+        const userCred = await createUserWithEmailAndPassword(auth, emailInput, passInput);
+        // Send Verification Email immediately on Signup
+        await sendEmailVerification(userCred.user);
+        alert("A verification email has been sent. Please check your inbox before logging in.");
+      } else {
+        await signInWithEmailAndPassword(auth, emailInput, passInput);
+      }
     } catch (err) { setAuthError(err.message); }
   };
 
@@ -289,7 +303,6 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     });
   };
 
-  // --- NEW: DUAL PORT ASSIGNMENT ---
   const adminAssignTunnel = async (reqId, email, data, type) => {
     const exp = new Date();
     const duration = type === 'trial' ? 1 : Number(data.days);
@@ -300,8 +313,8 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
       clientEmail: email, 
       user: data.u, 
       pass: data.p, 
-      port: data.port, // Port 1: Winbox
-      portAux: data.portAux, // Port 2: SSH/API
+      port: data.port, 
+      portAux: data.portAux, 
       service: data.service, 
       expiry: exp.toISOString(),
       expiryNotified: false,
@@ -317,7 +330,6 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     );
   };
 
-  // --- NEW: SUPPORT TICKET HANDLERS ---
   const createTicket = async (e) => {
     e.preventDefault();
     if (!ticketSubject) return;
@@ -340,41 +352,27 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
 
   const handleReply = async (e) => {
   e.preventDefault();
-  if (!replyBody || !activeTicket) {
-    console.log("Missing body or active ticket");
-    return;
-  }
+  if (!replyBody || !activeTicket) return;
 
   try {
-    console.log("Attempting reply to ticket:", activeTicket.id);
-    
-    // 1. Reference the specific ticket
     const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
     const messagesCol = collection(ticketRef, 'messages');
 
-    // 2. Try to add the message
     await addDoc(messagesCol, {
       sender: user.email,
       text: replyBody,
       timestamp: serverTimestamp()
     });
-    console.log("Message added to Firestore");
 
-    // 3. Try to update the main ticket
     await updateDoc(ticketRef, {
       lastUpdate: new Date().toISOString(),
       status: user.role === 'admin' ? 'answered' : 'open'
     });
-    console.log("Ticket status updated");
 
-    // 4. Send Email
     const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
     sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
-
     setReplyBody("");
   } catch (err) {
-    // This will tell us the REAL error in the console
-    console.error("DETAILED ERROR:", err.code, err.message);
     alert(`Failed to send reply: ${err.message}`);
   }
 };
@@ -396,7 +394,35 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono italic animate-pulse tracking-widest">INITIALIZING SWIFFTNET CORE...</div>;
 
-  // --- VIEWS ---
+  // --- NEW: EMAIL VERIFICATION VIEW ---
+  if (view === 'verify-email') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
+        <div className="text-orange-500 mb-8 scale-150 animate-bounce"><IconShield /></div>
+        <div className="w-full max-w-md bg-slate-900/50 p-10 rounded-[40px] border border-orange-500/20 shadow-2xl text-center space-y-6">
+          <h2 className="text-2xl font-black uppercase tracking-widest italic">Verify Your Identity</h2>
+          <p className="text-slate-400 font-medium text-sm">We've sent a verification link to your email. Please click the link to activate your SwifftNet account.</p>
+          <div className="bg-black/40 p-4 rounded-2xl border border-slate-800">
+            <code className="text-blue-400 text-xs font-bold">{auth.currentUser?.email}</code>
+          </div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl transition-all"
+          >
+            I have Verified
+          </button>
+          <button 
+            onClick={handleLogout} 
+            className="w-full text-slate-500 text-[10px] font-black uppercase underline tracking-widest"
+          >
+            Logout & Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- LANDING VIEW ---
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 animate-in fade-in duration-500">
@@ -417,6 +443,7 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
     );
   }
 
+  // --- CLIENT DASHBOARD ---
   if (view === 'dashboard' && user) {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
@@ -455,7 +482,7 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
               </div>
             )}
             <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
-               <div className="flex flex-col lg:flex-row gap-4 items-center">
+                <div className="flex flex-col lg:flex-row gap-4 items-center">
                   <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
                      <option value="winbox">Winbox</option><option value="api">API</option><option value="ssh">SSH</option>
                   </select>
@@ -466,7 +493,7 @@ const sendEmail = (toEmail, subject, body, ticketId = "General") => {
                   {bal >= VPN_PRICE ? (
                     <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap">Buy Node</button>
                   ) : <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>}
-               </div>
+                </div>
             </div>
           </div>
 
@@ -515,7 +542,7 @@ set ssh address=192.168.89.0/24` : "";
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
                           
-                          {/* 1. DEPLOYMENT BUTTON: Shows ONLY when status is 'assigned' */}
+                          {/* 1. DEPLOYMENT BUTTON */}
                           {req.status === 'assigned' && (
                             <button 
                               onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} 
@@ -525,7 +552,7 @@ set ssh address=192.168.89.0/24` : "";
                             </button>
                           )}
 
-                          {/* 2. INSTRUCTIONS PANEL: Shows ONLY when status is 'active' */}
+                          {/* 2. INSTRUCTIONS PANEL */}
                           {req.status === 'active' && (
                             <div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95 shadow-2xl">
                               <div className="flex items-center gap-3 text-emerald-400">
@@ -537,7 +564,7 @@ set ssh address=192.168.89.0/24` : "";
                               </p>
                               <div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner">
                                 <code className="text-emerald-400 font-black text-lg font-mono tracking-tighter">
-                                  remote.swifftnet.site:<span className="text-white underline"> your port number na naka assign, please check the ports below </span>
+                                  remote.swifftnet.site:<span className="text-white underline"> check ports below </span>
                                 </code>
                               </div>
                               <div className="pt-4 border-t border-emerald-500/10 flex justify-between items-center">
@@ -549,13 +576,13 @@ set ssh address=192.168.89.0/24` : "";
                             </div>
                           )}
 
-                          {/* 3. CREDENTIALS BOX: Always visible for both statuses */}
+                          {/* 3. CREDENTIALS BOX */}
                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden">
                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div>
                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div>
                           </div>
 
-                          {/* 4. MIKROTIK SCRIPT: Always visible */}
+                          {/* 4. MIKROTIK SCRIPT */}
                           <div className="space-y-4">
                             <p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p>
                             <div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl">
@@ -566,7 +593,7 @@ set ssh address=192.168.89.0/24` : "";
                             </div>
                           </div>
 
-                          {/* 5. PORT SUMMARY FOOTER: Always visible */}
+                          {/* 5. PORT SUMMARY FOOTER */}
                           <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800">
                             <div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl">
                               <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p>
@@ -698,7 +725,6 @@ set ssh address=192.168.89.0/24` : "";
 
           {adminTab === 'tickets' && (
             <div className="grid md:grid-cols-3 gap-8">
-              {/* TICKET LIST */}
               {tickets.filter(t => t.status !== 'closed').sort((a,b) => new Date(b.lastUpdate) - new Date(a.lastUpdate)).map(t => (
                 <div key={t.id} onClick={() => setActiveTicket(t)} className={`bg-slate-900 p-8 rounded-[40px] border border-slate-800 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group ${t.status === 'open' ? 'border-l-4 border-l-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]' : 'border-l-4 border-l-emerald-500'}`}>
                   <p className="text-[10px] font-black text-blue-500 mb-2 truncate uppercase tracking-widest">{t.clientEmail}</p>
@@ -711,12 +737,9 @@ set ssh address=192.168.89.0/24` : "";
                 </div>
               ))}
 
-              {/* ADMIN CHAT MODAL */}
               {activeTicket && (
                 <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 md:p-10 z-[100] animate-in fade-in duration-300">
                   <div className="bg-slate-900 w-full max-w-3xl h-[90vh] rounded-[50px] border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_60px_rgba(37,99,235,0.2)]">
-                    
-                    {/* MODAL HEADER */}
                     <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
                       <div className="space-y-1">
                         <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {activeTicket.id.slice(-6)}</p>
@@ -724,7 +747,6 @@ set ssh address=192.168.89.0/24` : "";
                         <p className="text-[9px] text-slate-500 font-bold">{activeTicket.clientEmail}</p>
                       </div>
                       <div className="flex gap-4">
-                        {/* CLOSE TICKET BUTTON */}
                         <button 
                             onClick={async () => {
                               if(window.confirm("Close this ticket? Client will be notified.")) {
@@ -741,7 +763,6 @@ set ssh address=192.168.89.0/24` : "";
                       </div>
                     </div>
 
-                    {/* CHAT MESSAGES */}
                     <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]">
                       {messages.map(m => (
                         <div key={m.id} className={`flex flex-col ${m.sender === user.email ? 'items-end' : 'items-start'}`}>
@@ -753,7 +774,6 @@ set ssh address=192.168.89.0/24` : "";
                       ))}
                     </div>
 
-                    {/* ADMIN REPLY FORM */}
                     <form onSubmit={handleReply} className="p-8 bg-slate-950 border-t border-slate-800 flex gap-4">
                       <input 
                         value={replyBody} 
@@ -765,7 +785,6 @@ set ssh address=192.168.89.0/24` : "";
                         Send Reply
                       </button>
                     </form>
-
                   </div>
                 </div>
               )}
@@ -785,7 +804,6 @@ set ssh address=192.168.89.0/24` : "";
               <tbody className="divide-y divide-slate-800/50">
                 {getAllClients().map(email => (
                   <tr key={email} className="hover:bg-slate-800/20 transition-all group">
-                    {/* CLIENT INFO */}
                     <td className="p-10 align-top">
                       <div className="flex flex-col gap-1">
                         <span className="font-black text-white italic truncate max-w-[250px] text-sm group-hover:text-blue-400 transition-colors">
@@ -796,16 +814,12 @@ set ssh address=192.168.89.0/24` : "";
                         </span>
                       </div>
                     </td>
-
-                    {/* BALANCE INFO */}
                     <td className="p-10 text-center align-top">
                       <div className="bg-slate-950/50 inline-block px-6 py-3 rounded-2xl border border-slate-800">
                         <p className="text-2xl font-black text-emerald-500">₱{getUserBalance(email)}</p>
                         <p className="text-[8px] text-slate-600 font-black uppercase">Available Credits</p>
                       </div>
                     </td>
-
-                    {/* ASSIGNMENTS / NODES */}
                     <td className="p-10 align-top">
                       <div className="space-y-4">
                         {assignments.filter(a => a.clientEmail === email).length > 0 ? (
@@ -818,7 +832,6 @@ set ssh address=192.168.89.0/24` : "";
                                 : 'border-slate-800'
                               }`}
                             >
-                              {/* HEADER: STATUS & PORTS */}
                               <div className="flex justify-between items-start mb-3">
                                 <div className="flex flex-col">
                                   <span className="text-blue-400 font-mono text-[11px] font-black uppercase leading-none">
@@ -828,8 +841,6 @@ set ssh address=192.168.89.0/24` : "";
                                     SSH/API: <span className="text-white">{t.portAux || 'N/A'}</span>
                                   </span>
                                 </div>
-                                
-                                {/* LIVE INDICATOR */}
                                 <div className="flex flex-col items-end gap-1">
                                   <div className="flex items-center gap-2">
                                     <span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>
@@ -845,13 +856,10 @@ set ssh address=192.168.89.0/24` : "";
                                 </div>
                               </div>
 
-                              {/* EXPIRY INFO */}
                               <div className="flex justify-between items-center pt-3 border-t border-slate-900">
                                 <span className="text-slate-600 font-mono text-[9px] font-black italic uppercase">
                                   Exp: {new Date(t.expiry).toLocaleDateString()}
                                 </span>
-                                
-                                {/* ADMIN ACTIONS ON HOVER */}
                                 <div className="flex items-center gap-2 opacity-0 group-hover/node:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => resendActivationEmail(t)} 
