@@ -653,7 +653,7 @@ export default function App() {
   }
 
 
-// --- VIEW: PRIVACY POLICY ---
+// --- VIEW: PRIVACY POLICY (FULL & EXACT) ---
 if (view === 'privacy') {
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
@@ -666,74 +666,113 @@ if (view === 'privacy') {
           </div>
           <button 
             onClick={() => setView('landing')} 
-            className="bg-slate-800 hover:bg-blue-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all"
+            className="bg-slate-800 hover:bg-blue-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all border border-slate-700"
           >
             Back
           </button>
         </header>
 
-        <div className="text-slate-300 text-sm space-y-6 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
+        <div className="text-slate-300 text-sm space-y-8 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
           <p>
-            This Privacy Policy outlines how <strong>SwifftNET</strong> (vpn.swifftnet.site) collects, uses, and protects your data. As a Philippine-based provider, we are committed to upholding the <strong>Data Privacy Act of 2012 (RA 10173)</strong>.
+            This Privacy Policy outlines how <strong>SwifftNET</strong> (vpn.swifftnet.site) collects, uses, and protects your data when you use our Remote Access and VPN services. As a Philippine-based provider, we are committed to upholding the <strong>Data Privacy Act of 2012 (RA 10173)</strong> and ensuring your network activity remains secure and private.
           </p>
 
-          <section className="space-y-3">
-            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">1. Information We Collect</h2>
-            <div className="bg-black/30 p-5 rounded-2xl border border-slate-800">
-              <p className="mb-2 font-bold text-white uppercase text-xs">A. Account Information</p>
-              <ul className="list-disc ml-5 space-y-1 text-slate-400">
-                <li><strong>Personal Identity:</strong> Full Name, Contact Number, and Email Address.</li>
-                <li><strong>Billing Details:</strong> Records of payments and subscription status.</li>
-                <li><strong>Credentials:</strong> Username and encrypted passwords for VPN access.</li>
-              </ul>
-              <p className="mt-4 mb-2 font-bold text-white uppercase text-xs">B. Technical & Usage Logs</p>
-              <ul className="list-disc ml-5 space-y-1 text-slate-400">
-                <li><strong>Connection Metadata:</strong> Time of connection/disconnection and total bandwidth used.</li>
-                <li><strong>IP Addresses:</strong> Your assigned internal VPN IP and the public IP used to connect.</li>
-                <li><strong>Device Info:</strong> Basic identifiers of the device connecting to the server.</li>
-              </ul>
-              <p className="mt-4 italic text-xs text-blue-500/80">Note: We do NOT monitor, record, or store the specific websites you visit or the content of your communications.</p>
+          <section className="space-y-4">
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">1. Information We Collect</h2>
+            <p>To provide reliable remote access, we collect two categories of information:</p>
+            
+            <div className="pl-6 space-y-4 border-l-2 border-blue-500/30">
+              <div>
+                <h3 className="text-white font-bold uppercase text-xs mb-2">A. Account Information</h3>
+                <p className="mb-2 italic text-slate-400">When you subscribe or create an account, we may collect:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li><strong>Personal Identity:</strong> Full Name, Contact Number, and Email Address.</li>
+                  <li><strong>Billing Details:</strong> Records of payments and subscription status.</li>
+                  <li><strong>Credentials:</strong> Username and encrypted passwords for VPN access.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-white font-bold uppercase text-xs mb-2">B. Technical & Usage Logs</h3>
+                <p className="mb-2 italic text-slate-400">As an ISP/Remote Access provider, we process limited technical data to maintain service quality:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li><strong>Connection Metadata:</strong> Time of connection/disconnection and total bandwidth used.</li>
+                  <li><strong>IP Addresses:</strong> Your assigned internal VPN IP and the public IP used to connect.</li>
+                  <li><strong>Device Info:</strong> Basic identifiers of the device connecting to the server.</li>
+                </ul>
+              </div>
             </div>
+            <p className="bg-blue-500/10 p-4 rounded-2xl border border-blue-500/20 text-xs italic">
+              <strong>Note:</strong> We do <strong>not</strong> monitor, record, or store the specific websites you visit or the content of your communications while connected to our Remote Access service.
+            </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">2. Purpose of Data Processing</h2>
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">2. Purpose of Data Processing</h2>
+            <p>We use your data strictly for the following purposes:</p>
             <ul className="list-disc ml-5 space-y-2">
               <li><strong>Service Delivery:</strong> Authenticating your access and managing your remote connection.</li>
               <li><strong>Security:</strong> Monitoring for unauthorized login attempts or network abuse.</li>
               <li><strong>Support:</strong> Troubleshooting connectivity issues for your specific account.</li>
-              <li><strong>Legal Compliance:</strong> Adhering to Philippine laws, such as the Anti-Child Pornography Act (RA 9775).</li>
+              <li><strong>Legal Compliance:</strong> Adhering to Philippine laws, such as the <strong>Anti-Child Pornography Act (RA 9775)</strong>, which requires ISPs to preserve certain access logs (origin/destination of access) for a limited period.</li>
             </ul>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-blue-400 font-black uppercase tracking-tight italic">3. Data Retention & Security</h2>
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">3. Data Retention & Security</h2>
             <ul className="list-disc ml-5 space-y-2">
-              <li><strong>Encryption:</strong> Secured using industry-standard protocols (WireGuard, OVPN, L2TP, or SSTP) with <strong>AES-256 bit encryption</strong>.</li>
-              <li><strong>Retention:</strong> Connection logs are automatically purged after <strong>60 days</strong> unless a longer period is legally mandated.</li>
-              <li><strong>Access Control:</strong> Access to our MikroTik/RouterOS backend is strictly limited to authorized SwifftNET administrators.</li>
+              <li><strong>Encryption:</strong> All remote access traffic is secured using industry-standard protocols (e.g., WireGuard, OVPN, L2TP, or SSTP) with <strong>AES-256 bit encryption</strong>.</li>
+              <li><strong>Retention:</strong> We only keep personal data for as long as your account is active or as required by NTC regulations. Connection logs are automatically purged after <strong>60 days</strong> unless a longer period is legally mandated.</li>
+              <li><strong>Access Control:</strong> Access to our backend systems (MikroTik/RouterOS) is strictly limited to authorized SwifftNET administrators.</li>
             </ul>
           </section>
 
-          <section className="space-y-3 border-t border-slate-800 pt-6 text-center">
-            <h2 className="text-white font-black uppercase text-xs tracking-widest mb-2">Contact Our Data Protection Officer</h2>
-            <p className="text-blue-400 font-bold">ramoshowardkingsley58@gmail.com</p>
-            <p className="text-slate-500 text-[10px] uppercase font-black">Santa Ana Cagayan Valley | vpn.swifftnet.site</p>
+          <section className="space-y-3">
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">4. Your Rights as a Data Subject</h2>
+            <p>Under the Data Privacy Act of 2012, you have the right to:</p>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>Be Informed:</strong> Know how your data is being used (as detailed here).</li>
+              <li><strong>Access:</strong> Request a copy of the personal information we hold about you.</li>
+              <li><strong>Rectify:</strong> Correct any inaccuracies in your account details.</li>
+              <li><strong>Object/Erasure:</strong> Request the deletion of your account and data, subject to legal retention requirements.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">5. Third-Party Sharing</h2>
+            <p>We <strong>never sell</strong> your personal data. Sharing only occurs with:</p>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>Payment Processors:</strong> To verify and complete your subscription payments.</li>
+              <li><strong>Law Enforcement:</strong> Only when presented with a valid court order or subpoena in accordance with Philippine law.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 pt-6 border-t border-slate-800">
+            <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">6. Contact Us</h2>
+            <p>If you have questions about this policy or wish to exercise your privacy rights, please contact our Data Protection Officer:</p>
+            <div className="bg-black/40 p-6 rounded-3xl border border-slate-800 space-y-1">
+              <p className="font-black text-white uppercase text-sm">SwifftNET Support</p>
+              <p className="text-blue-400 font-bold">Email: ramoshowardkingsley58@gmail.com</p>
+              <p className="text-slate-500 text-xs">Location: Santa Ana Cagayan Valley</p>
+              <p className="text-slate-500 text-xs">Website: vpn.swifftnet.site</p>
+            </div>
           </section>
         </div>
 
-        <button 
-          onClick={() => setView('landing')} 
-          className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
-        >
-          Return to Login
-        </button>
+        <footer className="pt-4">
+          <button 
+            onClick={() => setView('landing')} 
+            className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
+          >
+            I Understand - Return to Login
+          </button>
+        </footer>
       </div>
     </div>
   );
 }
 
-// --- VIEW: TERMS OF USE ---
+// --- VIEW: TERMS OF USE (FULL & EXACT) ---
 if (view === 'terms') {
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
@@ -741,71 +780,100 @@ if (view === 'terms') {
         
         <header className="border-b border-slate-800 pb-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-black uppercase italic text-emerald-500 leading-none">Terms of Use</h1>
+            <h1 className="text-3xl font-black uppercase italic text-emerald-500 leading-none">Terms of Service</h1>
             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">Last Updated: March 31, 2026</p>
           </div>
           <button 
             onClick={() => setView('landing')} 
-            className="bg-slate-800 hover:bg-emerald-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all"
+            className="bg-slate-800 hover:bg-emerald-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all border border-slate-700"
           >
             Back
           </button>
         </header>
 
-        <div className="text-slate-300 text-sm space-y-6 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
+        <div className="text-slate-300 text-sm space-y-8 font-medium leading-relaxed overflow-y-auto max-h-[65vh] pr-4 custom-scrollbar">
           <p className="italic text-slate-400">
-            This agreement governs your use of <strong>SwifftNET REMOTE Access</strong>. By using our services, you agree to be bound by these terms.
+            This Terms of Service agreement governs your use of <strong>SwifftNET REMOTE Access</strong> and the services provided via <strong>vpn.swifftnet.site</strong>. By accessing or using our services, you agree to be bound by these terms.
           </p>
 
           <section className="space-y-3">
-            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">1. Acceptance of Terms</h2>
-            <p>By subscribing, you acknowledge that you have read and agreed to these Terms. If using for a business, you represent that you have the authority to bind that entity.</p>
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">1. Acceptance of Terms</h2>
+            <p>By subscribing to or using SwifftNET services, you acknowledge that you have read, understood, and agreed to these Terms of Service. If you are using this service on behalf of a business or entity, you represent that you have the authority to bind that entity to these terms.</p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">2. User Responsibilities & Conduct</h2>
-            <div className="bg-black/30 p-5 rounded-2xl border border-slate-800 space-y-4">
-              <p className="font-bold text-white uppercase text-xs">Strictly Prohibited Activities:</p>
-              <ul className="list-disc ml-5 space-y-2 text-slate-400 text-xs">
-                <li><strong>Illegal Activity:</strong> Violations of the <strong>Cybercrime Prevention Act of 2012 (RA 10175)</strong>.</li>
-                <li><strong>Abuse:</strong> DDoS attacks, unauthorized access, or malware distribution.</li>
-                <li><strong>Reselling:</strong> Selling or transferring accounts without SwifftNET consent.</li>
-                <li><strong>Spamming:</strong> Using tunnels for unsolicited bulk emails or advertisements.</li>
-              </ul>
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">2. Description of Service</h2>
+            <p>SwifftNET provides remote access and VPN solutions primarily designed for network management, secure browsing, and remote connectivity. We reserve the right to modify, suspend, or discontinue any aspect of the service at any time to maintain network integrity or perform scheduled maintenance.</p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">3. User Responsibilities & Conduct</h2>
+            <p>You are responsible for all activity that occurs under your account. To maintain the security and quality of our network, you agree <strong>not</strong> to:</p>
+            <div className="pl-6 space-y-4 border-l-2 border-emerald-500/30">
+              <p><strong>Illegal Activity:</strong> Use the service for any purpose that violates Philippine laws, including the <strong>Cybercrime Prevention Act of 2012 (RA 10175)</strong>.</p>
+              <p><strong>Abuse:</strong> Attempt to gain unauthorized access to our servers, perform DDoS attacks, or distribute malware.</p>
+              <p><strong>Reselling:</strong> Sell, trade, or transfer your account to third parties without express written consent from SwifftNET management.</p>
+              <p><strong>Spamming:</strong> Use our remote access tunnels to send unsolicited bulk emails or commercial advertisements.</p>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">3. Payment & Subscriptions</h2>
-            <ul className="list-disc ml-5 space-y-2">
-              <li><strong>Fees:</strong> Access is provided on a subscription basis at current listed rates.</li>
-              <li><strong>Refunds:</strong> Digital payments are generally <strong>non-refundable</strong>. Technical failures will be reviewed case-by-case.</li>
-              <li><strong>Late Payments:</strong> Unsettled renewals result in <strong>automatic suspension</strong> of the remote access tunnel.</li>
-            </ul>
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">4. Payment and Subscriptions</h2>
+            <div className="space-y-3 text-slate-400">
+              <p><strong>Fees:</strong> Access to SwifftNET Remote Access is provided on a subscription basis. Current rates are listed on our official website.</p>
+              <p><strong>Refunds:</strong> Due to the digital nature of our service, payments are generally non-refundable. However, issues involving technical failure on our end will be reviewed on a case-by-case basis.</p>
+              <p><strong>Late Payments:</strong> Failure to settle subscription renewals may result in the automatic suspension of your remote access tunnel.</p>
+            </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">4. Service Level & Disclaimers</h2>
-            <p>Service is provided <strong>"As-Is."</strong> While we strive for 99.9% uptime, speeds may vary based on your local ISP (PLDT, Globe, Starlink, etc.) and network congestion.</p>
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">5. Service Level & Disclaimers</h2>
+            <div className="space-y-3 text-slate-400">
+              <p><strong>"As-Is" Basis:</strong> The service is provided "as is" and "as available." While we strive for 99.9% uptime, we do not guarantee that the service will be uninterrupted or error-free.</p>
+              <p><strong>Speed & Latency:</strong> Connection speeds may vary depending on your local ISP (e.g., PLDT, Globe, Starlink), network congestion, and geographical distance from our nodes.</p>
+              <p><strong>Data Loss:</strong> SwifftNET is not responsible for any data loss or security breaches resulting from user negligence, such as weak passwords or shared credentials.</p>
+            </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-emerald-400 font-black uppercase tracking-tight italic">5. Termination & Liability</h2>
-            <p>SwifftNET reserves the right to terminate access immediately for breaches of these terms. We are not liable for indirect damages or data loss resulting from weak user security.</p>
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">6. Limitation of Liability</h2>
+            <p>To the maximum extent permitted by law, <strong>SwifftNET</strong> and its developers shall not be liable for any indirect, incidental, or consequential damages (including loss of profits or data) arising out of your use or inability to use the service.</p>
           </section>
 
-          <section className="space-y-3 border-t border-slate-800 pt-6 text-center">
-            <h2 className="text-white font-black uppercase text-xs tracking-widest mb-2">Governing Law</h2>
-            <p className="text-slate-500 text-[10px] uppercase font-black">Republic of the Philippines | Proper Courts of the Philippines</p>
+          <section className="space-y-3">
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">7. Termination</h2>
+            <p>We reserve the right to terminate or suspend your access immediately, without prior notice, if you breach these terms or engage in activities that threaten the stability of our network. Upon termination, your right to use the service will cease immediately.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">8. Governing Law</h2>
+            <p>These terms are governed by and construed in accordance with the laws of the <strong>Republic of the Philippines</strong>. Any legal actions arising from these terms shall be settled in the proper courts of the Philippines.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">9. Changes to Terms</h2>
+            <p>SwifftNET reserves the right to update these terms at any time. We will notify active subscribers of significant changes via the email address associated with their account or through a notice on vpn.swifftnet.site.</p>
+          </section>
+
+          <section className="space-y-4 pt-6 border-t border-slate-800">
+            <h2 className="text-emerald-500 font-black uppercase tracking-tight italic text-lg">Contact Information</h2>
+            <p>For any inquiries regarding these terms, please reach out to:</p>
+            <div className="bg-black/40 p-6 rounded-3xl border border-slate-800 space-y-1">
+              <p className="font-black text-white uppercase text-sm">SwifftNET Management</p>
+              <p className="text-emerald-400 font-bold">Email: ramoshowardkingsley58@gmail.com</p>
+              <p className="text-slate-500 text-xs">Website: vpn.swifftnet.site</p>
+            </div>
           </section>
         </div>
 
-        <button 
-          onClick={() => setView('landing')} 
-          className="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)]"
-        >
-          I Accept - Return to Login
-        </button>
+        <footer className="pt-4">
+          <button 
+            onClick={() => setView('landing')} 
+            className="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+          >
+            I Accept These Terms
+          </button>
+        </footer>
       </div>
     </div>
   );
