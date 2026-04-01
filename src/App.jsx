@@ -351,7 +351,7 @@ export default function App() {
 
       // 4. Notifications
       sendEmail(user.email, "SwifftNet: Renewal Successful! ✅", 
-        `Your node has been auto-renewed for 1 year. New expiry: ${baseDate.toLocaleDateString()}`);
+        `Your VPN FOR REMOTE ACCESS has been auto-renewed for 1 year. New expiry: ${baseDate.toLocaleDateString()}`);
       
       sendEmail(ADMIN_EMAIL, `Alert: Auto-Renewal Paid (${user.email})`, 
         `User ${user.email} auto-renewed Node ${existingAsgn.port}. ₱${VPN_PRICE} deducted.`);
@@ -396,7 +396,7 @@ export default function App() {
       });
       
       // 3. Magbigay ng confirmation alert
-      alert("Trial Request Sent! Please wait for the Admin to authorize your node.");
+      alert("Trial Request Sent! Please wait for the Admin to authorize VPN CREDENTIALS.");
     } catch (err) {
       // 4. Magbigay ng error alert kung may problema (hal. Permissions)
       console.error("Trial Error:", err);
@@ -454,10 +454,10 @@ export default function App() {
     // Notify client via email
     sendEmail(
       email, 
-      type === 'renewal' ? "SwifftNet: Node Renewed! ⏳" : "SwifftNet: Nodes Assigned! 🚀", 
+      type === 'renewal' ? "SwifftNet: VPN Renewed! ⏳" : "SwifftNet: VPN PORT Assigned! 🚀", 
       type === 'renewal' 
-        ? `Your node has been extended. New expiry: ${finalExpiry.toLocaleDateString()}`
-        : `Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
+        ? `Your VPN CREDENTIALS has been extended. New expiry: ${finalExpiry.toLocaleDateString()}`
+        : `Your VPN credentials are ready as well as Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
     );
     
     alert(type === 'renewal' ? "Assignment Updated (Renewed)" : "New Assignment Created");
