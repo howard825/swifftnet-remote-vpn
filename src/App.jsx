@@ -650,7 +650,8 @@ export default function App() {
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
-                const asgn = assignments.find(a => a.requestId === req.id);
+                // Hinahanap ang assignment base sa requestId (for new/trial) O vpnId (for renewal)
+                const asgn = assignments.find(a => a.requestId === req.id || (req.vpnId && a.requestId === req.vpnId));
                 const hasPendingRenewal = requests.some(r => r.vpnId === req.id && r.status === 'pending');
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
