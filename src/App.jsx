@@ -597,6 +597,7 @@ export default function App() {
     );
   }
 // --- VIEW: DASHBOARD ---
+// --- VIEW: DASHBOARD ---
 if (view === 'dashboard' && user) {
   const bal = getUserBalance(user.email);
   const myReqs = requests.filter(r => r.email === user.email);
@@ -606,7 +607,9 @@ if (view === 'dashboard' && user) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
-      <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* HEADER */}
         <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6 shadow-xl">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl uppercase border-4 border-blue-600">{user.name[0]}</div>
@@ -625,6 +628,7 @@ if (view === 'dashboard' && user) {
           </div>
         </header>
 
+        {/* TOP STATS CARDS */}
         <div className="grid md:grid-cols-4 gap-8">
           <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
             <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
@@ -662,9 +666,12 @@ if (view === 'dashboard' && user) {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-12">
+        {/* MAIN LAYOUT: INSTANCES VS SIDEBAR */}
+        <div className="grid lg:grid-cols-3 gap-12 items-start">
+          
+          {/* LEFT: REMOTE INSTANCES (SASAKOP NG 2/3 NG SCREEN) */}
           <div className="lg:col-span-2 space-y-10">
-            <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
+            <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic"><IconShield /> Remote Instances</h2>
             {(() => {
               const seenNodes = new Set();
               const uniqueRequests = [];
@@ -680,6 +687,8 @@ if (view === 'dashboard' && user) {
                 }
               });
 
+              if (uniqueRequests.length === 0) return <div className="bg-slate-900/30 p-12 rounded-[40px] border border-slate-800 border-dashed text-center text-slate-500 font-bold italic uppercase">No active instances yet.</div>;
+
               return uniqueRequests.map((req) => {
                 const asgn = assignments.find(a => 
                   a.requestId === req.id || 
@@ -693,8 +702,8 @@ if (view === 'dashboard' && user) {
                 const script = asgn ? `${protocol === 'l2tp' ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes` : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`}\n/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24\n/ip service\nset winbox address=192.168.89.0/24\nset api address=192.168.89.0/24\nset ssh address=192.168.89.0/24` : "";
 
                 return (
-                  <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
-                    <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
+                  <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-8 animate-in slide-in-from-left-4 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
+                    <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800 rounded-t-[50px]">
                       <div className="flex items-center gap-3">
                         {!isExpired && asgn && (<div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />)}
                         <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
@@ -702,9 +711,6 @@ if (view === 'dashboard' && user) {
                       <div className="flex items-center gap-4">
                         {req.status === 'active' && !isExpired && !hasPendingRenewal && (
                           <button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600/10 text-emerald-500 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all">Renew +1 Year</button>
-                        )}
-                        {hasPendingRenewal && (
-                          <span className="text-orange-500 text-[9px] font-black uppercase italic animate-pulse">Renewal Pending...</span>
                         )}
                         <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
                           {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
@@ -743,81 +749,90 @@ if (view === 'dashboard' && user) {
                 );
               });
             })()}
+          </div>
 
-            <div className="space-y-10">
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconTicket /> Support Tickets</h2>
-              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-6 shadow-2xl overflow-hidden min-h-[400px]">
+          {/* RIGHT: SIDEBAR (TICKETS, GCASH, HISTORY) */}
+          <div className="space-y-12">
+            
+            {/* SUPPORT TICKETS SECTION */}
+            <section className="space-y-6">
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconTicket /> Support</h2>
+              <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 shadow-2xl overflow-hidden min-h-[300px]">
                 {!activeTicket ? (
                   <>
                     <form onSubmit={createTicket} className="space-y-4">
-                      <input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Topic: e.g. Port help..." className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-bold text-sm" />
-                      <button className="w-full bg-blue-600 py-4 rounded-3xl font-black uppercase text-xs">Open Ticket</button>
+                      <input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Topic: e.g. Port help..." className="w-full bg-slate-950 border border-slate-800 p-4 rounded-3xl outline-none font-bold text-xs" />
+                      <button className="w-full bg-blue-600 py-3 rounded-3xl font-black uppercase text-[10px]">Open Ticket</button>
                     </form>
-                    <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                    <div className="space-y-3 mt-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                       {tickets.map(t => (
-                        <div key={t.id} onClick={() => setActiveTicket(t)} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 cursor-pointer hover:border-emerald-500 transition-all">
-                          <p className="text-xs font-black uppercase mb-1 truncate">{t.subject}</p>
-                          <div className="flex justify-between items-center text-[8px] font-black"><span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span><span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span></div>
+                        <div key={t.id} onClick={() => setActiveTicket(t)} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 cursor-pointer hover:border-emerald-500 transition-all">
+                          <p className="text-[10px] font-black uppercase mb-1 truncate">{t.subject}</p>
+                          <div className="flex justify-between items-center text-[7px] font-black"><span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span><span>{new Date(t.lastUpdate).toLocaleDateString()}</span></div>
                         </div>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col h-[500px]">
-                    <div className="flex justify-between items-center mb-4"><button onClick={() => setActiveTicket(null)} className="text-[10px] font-black text-blue-500 uppercase">← All Tickets</button><span className="text-[8px] font-black bg-blue-500/10 px-3 py-1 rounded-full">{activeTicket.subject.slice(0, 15)}...</span></div>
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
+                  <div className="flex flex-col h-[400px]">
+                    <div className="flex justify-between items-center mb-4"><button onClick={() => setActiveTicket(null)} className="text-[10px] font-black text-blue-500 uppercase">← Back</button></div>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 text-[10px]">
                       {messages.map(m => (
-                        <div key={m.id} className={`p-4 rounded-2xl max-w-[85%] text-[11px] font-medium ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
+                        <div key={m.id} className={`p-3 rounded-2xl max-w-[90%] ${m.sender === user.email ? 'bg-blue-600 ml-auto' : 'bg-slate-800'}`}>
                           {m.text}
-                          <p className="text-[7px] mt-1 opacity-50 uppercase">{m.sender === user.email ? 'Me' : 'Admin'}</p>
                         </div>
                       ))}
                     </div>
                     <form onSubmit={handleReply} className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                      <input value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder="Type reply..." className="flex-1 bg-transparent p-2 outline-none text-xs" />
-                      <button className="bg-emerald-600 px-4 py-2 rounded-xl font-black uppercase text-[9px]">Reply</button>
+                      <input value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder="Reply..." className="flex-1 bg-transparent p-2 outline-none text-[10px]" />
+                      <button className="bg-emerald-600 px-3 py-1 rounded-xl font-black uppercase text-[8px]">Send</button>
                     </form>
                   </div>
                 )}
               </div>
+            </section>
 
-              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono pt-10"><IconCard /> GCASH Load</h2>
-              <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 shadow-2xl">
-                <div className="bg-slate-950 p-6 rounded-3xl border border-dashed border-slate-800 text-center"><p className="text-2xl font-black text-blue-500 font-mono">0968 385 9759</p></div>
-                <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-6">
-                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-6 rounded-3xl outline-none font-black" />
-                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-6 rounded-3xl outline-none font-black uppercase" />
-                  <button className="w-full bg-emerald-600 py-6 rounded-3xl font-black uppercase">Confirm Deposit</button>
+            {/* GCASH LOAD SECTION */}
+            <section className="space-y-6">
+              <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconCard /> GCASH Load</h2>
+              <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl">
+                <div className="bg-slate-950 p-5 rounded-3xl border border-dashed border-slate-800 text-center"><p className="text-xl font-black text-blue-500 font-mono">0968 385 9759</p></div>
+                <form onSubmit={(e) => { e.preventDefault(); submitDeposit(e.target.amount.value, e.target.ref.value); e.target.reset(); }} className="space-y-4">
+                  <input name="amount" type="number" placeholder="₱ Amount" required className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-black text-sm" />
+                  <input name="ref" placeholder="G-Ref Number" required className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-black uppercase text-sm" />
+                  <button className="w-full bg-emerald-600 py-4 rounded-2xl font-black uppercase text-xs">Confirm Deposit</button>
                 </form>
               </div>
+            </section>
 
-              <div className="pt-8 border-t border-slate-800 space-y-6">
-                <div className="flex items-center gap-3 text-slate-400">
-                  <IconHistory />
-                  <h3 className="font-black text-[10px] uppercase tracking-widest italic">Recent History</h3>
-                </div>
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                  {myPayments.length === 0 ? (
-                    <p className="text-[10px] text-slate-600 italic uppercase text-center py-4">No transactions found</p>
-                  ) : myPayments.map((p) => (
-                    <div key={p.id} className="bg-black/40 p-4 rounded-2xl border border-slate-800 flex justify-between items-center group hover:border-slate-700 transition-all">
-                      <div>
-                        <p className="text-sm font-black text-white">₱{p.amount}</p>
-                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-tight">Ref: {p.refNo}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-[9px] font-black uppercase ${p.status === 'confirmed' ? 'text-emerald-500' : p.status === 'denied' ? 'text-red-500' : 'text-orange-500'}`}>
-                          {p.status}
-                        </p>
-                        <p className="text-[8px] text-slate-600 font-black mt-1 italic">{p.date}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* RECENT HISTORY SECTION */}
+            <section className="space-y-6">
+              <div className="flex items-center gap-3 text-slate-400">
+                <IconHistory />
+                <h3 className="font-black text-[10px] uppercase tracking-widest italic">History</h3>
               </div>
-            </div>
-          </div>
-        </div>
+              <div className="bg-slate-900 p-6 rounded-[40px] border border-slate-800 max-h-[300px] overflow-y-auto custom-scrollbar shadow-2xl">
+                {myPayments.length === 0 ? (
+                  <p className="text-[10px] text-slate-600 italic uppercase text-center py-4">No data</p>
+                ) : myPayments.map((p) => (
+                  <div key={p.id} className="bg-black/40 p-4 rounded-2xl border border-slate-800 flex justify-between items-center mb-3 group hover:border-slate-700 transition-all">
+                    <div>
+                      <p className="text-xs font-black text-white">₱{p.amount}</p>
+                      <p className="text-[7px] text-slate-500 font-bold uppercase">Ref: {p.refNo}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-[8px] font-black uppercase ${p.status === 'confirmed' ? 'text-emerald-500' : p.status === 'denied' ? 'text-red-500' : 'text-orange-500'}`}>
+                        {p.status}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+          </div> {/* END SIDEBAR */}
+        </div> {/* END MAIN GRID */}
+
       </div>
     </div>
   );
