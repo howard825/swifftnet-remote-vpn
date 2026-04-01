@@ -168,14 +168,27 @@ export default function App() {
   }, []);
 
   // --- DATA LISTENERS ---
+  // --- DATA LISTENERS (Fixed for Client Visibility) ---
   useEffect(() => {
     if (!user || !db) return;
     const base = ['artifacts', appId, 'public', 'data'];
     
-    onSnapshot(collection(db, ...base, 'payments'), (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    onSnapshot(collection(db, ...base, 'requests'), (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    onSnapshot(collection(db, ...base, 'assignments'), (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    // 1. PAYMENTS listener
+    const pCol = collection(db, ...base, 'payments');
+    const pQuery = user.role === 'admin' ? pCol : query(pCol, where('email', '==', user.email));
+    onSnapshot(pQuery, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
+    // 2. REQUESTS listener (Dito ang bara kanina)
+    const rCol = collection(db, ...base, 'requests');
+    const rQuery = user.role === 'admin' ? rCol : query(rCol, where('email', '==', user.email));
+    onSnapshot(rQuery, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    // 3. ASSIGNMENTS listener (Dapat 'clientEmail' ang gamit dito)
+    const aCol = collection(db, ...base, 'assignments');
+    const aQuery = user.role === 'admin' ? aCol : query(aCol, where('clientEmail', '==', user.email));
+    onSnapshot(aQuery, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    // 4. TICKETS listener
     const tCol = collection(db, ...base, 'tickets');
     const tQuery = user.role === 'admin' ? tCol : query(tCol, where('clientEmail', '==', user.email));
     onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
