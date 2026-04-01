@@ -662,67 +662,82 @@ export default function App() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
-              {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
-                // Hinahanap ang assignment base sa requestId (for new/trial) O vpnId (for renewal)
-                // Hinahanap ang assignment na pag-aari ng request na ito
-                const asgn = assignments.find(a => 
-                  a.requestId === req.id || 
-                  (req.vpnId && a.requestId === req.vpnId) ||
-                  (a.clientEmail === req.email && a.port === req.port) // Fallback match
-                );
-                const hasPendingRenewal = requests.some(r => r.vpnId === req.id && r.status === 'pending');
-                const protocol = req.protocol || 'l2tp'; 
-                const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
-                const isOnline = asgn?.isOnline === true;
-                const script = asgn ? `${protocol === 'l2tp' ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes` : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`}\n/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24\n/ip service\nset winbox address=192.168.89.0/24\nset api address=192.168.89.0/24\nset ssh address=192.168.89.0/24` : "";
-                return (
-                  <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
-                    <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
-                      <div className="flex items-center gap-3">
-                        {!isExpired && (asgn) && (<div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />)}
-                        <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
-                      </div>
-                      {/* RENEW ANYTIME BUTTON */}
-                      {/* RENEW ANYTIME BUTTON - Ngayon ay mawawala na kung may pending na */}
-                      {req.status === 'active' && !isExpired && !hasPendingRenewal && (
-                        <button 
-                          onClick={() => processAutoRenewal(req.id)}
-                          className="bg-emerald-600/10 text-emerald-500 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all mr-4"
-                        >
-                          Renew +1 Year
-                        </button>
-                      )}
+                {(() => {
+                  // 1. DEDUPLICATION LOGIC - Hahanapin natin ang pinakabagong request per node
+                  const seenNodes = new Set();
+                  const uniqueRequests = [];
 
-                      {/* OPTIONAL: Magpakita ng "Renewal Pending" text para alam ng user na natanggap ang request */}
-                      {hasPendingRenewal && (
-                        <span className="text-orange-500 text-[9px] font-black uppercase italic mr-4 animate-pulse">
-                          Renewal Pending...
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                        {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
-                      </span>
-                    </div>
-                    <div className="p-12">
-                      {isExpired ? (
-                        <div className="text-center space-y-6">
-                          <p className="text-slate-400 font-bold italic">Node has expired. Please renew.</p>
-                          {bal >= VPN_PRICE ? (<button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
+                  const sortedReqs = [...myReqs]
+                    .filter(r => ['new', 'trial', 'renewal'].includes(r.type))
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                  sortedReqs.forEach(req => {
+                    const nodeKey = req.vpnId || req.id;
+                    if (!seenNodes.has(nodeKey)) {
+                      uniqueRequests.push(req);
+                      seenNodes.add(nodeKey);
+                    }
+                  });
+
+                // 2. UI MAPPING - Isang card na lang per node
+                return uniqueRequests.map((req) => {
+                  const asgn = assignments.find(a => 
+                    a.requestId === req.id || 
+                    (req.vpnId && a.requestId === req.vpnId) ||
+                    (a.clientEmail === req.email && a.port === req.port)
+                  );
+                  const hasPendingRenewal = requests.some(r => r.vpnId === req.id && r.status === 'pending');
+                  const protocol = req.protocol || 'l2tp'; 
+                  const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
+                  const isOnline = asgn?.isOnline === true;
+                  const script = asgn ? `${protocol === 'l2tp' ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes` : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`}\n/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.89.0/24\n/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.89.0/24\n/ip service\nset winbox address=192.168.89.0/24\nset api address=192.168.89.0/24\nset ssh address=192.168.89.0/24` : "";
+
+                  return (
+                    <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-12 animate-in slide-in-from-bottom-2 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
+                      <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800">
+                        <div className="flex items-center gap-3">
+                          {!isExpired && (asgn) && (<div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />)}
+                          <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
                         </div>
-                      ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
-                        <div className="space-y-10">
-                          {req.status === 'assigned' && (<button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 animate-bounce flex items-center justify-center gap-3"><IconCheck /> FINISHED DEPLOYMENT</button>)}
-                          {req.status === 'active' && (<div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95"><div className="flex items-center gap-3 text-emerald-400"><IconShield /><h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3></div><p className="text-[13px] leading-relaxed text-slate-300 font-medium">Use <strong>Winbox</strong> or <strong>SSH</strong> to access your router.</p><div className="bg-black/60 p-5 rounded-2xl border border-emerald-500/20 text-center shadow-inner"><code className="text-emerald-400 font-black text-lg font-mono">remote.swifftnet.site: YOUR ASSIGNED PORT, CHECK BELOW  IF WINBOX, API/SSH</code></div></div>)}
-                          <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden"><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div></div>
-                          <div className="space-y-4"><p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p><div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl"><pre className="whitespace-pre-wrap">{script}</pre><button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 border border-slate-700">{copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}</button></div></div>
-                          <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800"><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p><p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p></div><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p></div></div>
+                        
+                        <div className="flex items-center gap-4">
+                          {req.status === 'active' && !isExpired && !hasPendingRenewal && (
+                            <button 
+                              onClick={() => processAutoRenewal(req.id)}
+                              className="bg-emerald-600/10 text-emerald-500 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all"
+                            >
+                              Renew +1 Year
+                            </button>
+                          )}
+                          {hasPendingRenewal && (
+                            <span className="text-orange-500 text-[9px] font-black uppercase italic animate-pulse">Renewal Pending...</span>
+                          )}
+                          <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                            {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
+                          </span>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="p-12">
+                        {isExpired ? (
+                          <div className="text-center space-y-6">
+                            <p className="text-slate-400 font-bold italic">Node has expired. Please renew.</p>
+                            {bal >= VPN_PRICE ? (<button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
+                          </div>
+                        ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
+                          <div className="space-y-10">
+                            {req.status === 'assigned' && (<button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 animate-bounce flex items-center justify-center gap-3"><IconCheck /> FINISHED DEPLOYMENT</button>)}
+                            {req.status === 'active' && (<div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95"><div className="flex items-center gap-3 text-emerald-400"><IconShield /><h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3></div><p className="text-[13px] leading-relaxed text-slate-300 font-medium">Use <strong>Winbox</strong> or <strong>SSH</strong> to access your router.</p></div>)}
+                            <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden"><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div><div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN Pass</span> <span className="text-white font-black">{asgn.pass}</span></div></div>
+                            <div className="space-y-4"><p className="text-[10px] font-black text-blue-400 uppercase italic tracking-[0.2em]">Deployment Script:</p><div className="bg-black/80 p-6 rounded-[24px] border border-slate-800 font-mono text-[10px] text-slate-500 relative group shadow-2xl"><pre className="whitespace-pre-wrap">{script}</pre><button onClick={() => handleCopy(script, `script-${req.id}`)} className="absolute right-4 top-4 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 border border-slate-700">{copiedId === `script-${req.id}` ? <IconCheck /> : <IconCopy />}</button></div></div>
+                            <div className="grid grid-cols-2 gap-6 pt-10 border-t border-slate-800"><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">Winbox Port</p><p className="text-2xl font-black text-emerald-400 font-mono">{asgn.port}</p></div><div className="bg-slate-950 p-6 rounded-[24px] text-center border border-slate-800 shadow-xl"><p className="text-[9px] text-slate-500 font-black uppercase mb-1">SSH/API Port</p><p className="text-2xl font-black text-blue-400 font-mono">{asgn.portAux || '---'}</p></div></div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                });
+              })()}
 
             <div className="space-y-10">
               <h2 className="text-xl font-black flex items-center gap-4 text-emerald-400 uppercase italic font-mono"><IconTicket /> Support Tickets</h2>
