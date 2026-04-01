@@ -362,11 +362,33 @@ export default function App() {
   };
 
   const createTrialRequest = async () => {
-    if (requests.some(r => r.email === user.email && r.type === 'trial')) return alert("Trial already used.");
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-      email: user.email, status: 'pending', type: 'trial', service: requestService, protocol: vpnProtocol, 
-      note: clientNote || "Free Trial", date: new Date().toLocaleDateString()
-    });
+    // 1. Check kung may trial na sa listahan
+    const alreadyHasTrial = requests.some(r => r.email === user.email && r.type === 'trial');
+    
+    if (alreadyHasTrial) {
+      alert("System: You have already used your free trial.");
+      return;
+    }
+
+    try {
+      // 2. Add the document to Firestore
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
+        email: user.email,
+        status: 'pending',
+        type: 'trial',
+        service: requestService, 
+        protocol: vpnProtocol,  
+        note: "Free Trial Request",
+        date: new Date().toLocaleDateString()
+      });
+      
+      // 3. Magbigay ng confirmation alert
+      alert("Trial Request Sent! Please wait for the Admin to authorize your node.");
+    } catch (err) {
+      // 4. Magbigay ng error alert kung may problema (hal. Permissions)
+      console.error("Trial Error:", err);
+      alert("Error: " + err.message);
+    }
   };
 
   const adminAssignTunnel = async (reqId, email, data, type, vpnId = null) => {
