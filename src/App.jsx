@@ -71,6 +71,7 @@ const IconCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const IconTelegram = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>;
 const IconTicket = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>;
 const IconEdit = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const IconHistory = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 
 export default function App() {
   const [user, setUser] = useState(null); 
@@ -297,6 +298,57 @@ export default function App() {
       status === 'confirmed' ? "Your balance has been updated." : "We could not verify your reference number.");
   };
 
+  const processAutoRenewal = async (vpnId) => {
+    const balance = getUserBalance(user.email);
+    
+    if (balance < VPN_PRICE) {
+      alert("Insufficient balance for auto-renewal.");
+      return;
+    }
+
+    const existingAsgn = assignments.find(a => a.requestId === vpnId);
+    if (!existingAsgn) {
+      alert("Node assignment not found.");
+      return;
+    }
+
+    try {
+      // 1. Calculate New Expiry
+      const currentExp = new Date(existingAsgn.expiry);
+      const baseDate = currentExp > new Date() ? currentExp : new Date();
+      baseDate.setDate(baseDate.getDate() + 365);
+      const newExpiry = baseDate.toISOString();
+
+      // 2. Update the Assignment directly
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', existingAsgn.id), {
+        expiry: newExpiry,
+        expiryNotified: false
+      });
+
+      // 3. Create a 'confirmed' request record as an audit trail (receipt)
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
+        email: user.email,
+        status: 'active', // 'active' agad, hindi na 'pending'
+        type: 'renewal',
+        vpnId: vpnId,
+        service: existingAsgn.service || 'winbox',
+        note: "Auto-Renewed (Paid)",
+        date: new Date().toLocaleDateString()
+      });
+
+      // 4. Notifications
+      sendEmail(user.email, "SwifftNet: Renewal Successful! ✅", 
+        `Your node has been auto-renewed for 1 year. New expiry: ${baseDate.toLocaleDateString()}`);
+      
+      sendEmail(ADMIN_EMAIL, `Alert: Auto-Renewal Paid (${user.email})`, 
+        `User ${user.email} auto-renewed Node ${existingAsgn.port}. ₱${VPN_PRICE} deducted.`);
+
+      alert("Node successfully renewed for +1 year!");
+    } catch (err) {
+      alert("Renewal failed: " + err.message);
+    }
+  };
+
   const createVpnRequest = async (type = 'new', vpnId = null) => {
     const balance = getUserBalance(user.email);
     if (balance >= VPN_PRICE) {
@@ -317,31 +369,63 @@ export default function App() {
     });
   };
 
-  const adminAssignTunnel = async (reqId, email, data, type) => {
-    const exp = new Date();
-    const duration = type === 'trial' ? 1 : Number(data.days);
-    exp.setDate(exp.getDate() + duration);
+  const adminAssignTunnel = async (reqId, email, data, type, vpnId = null) => {
+    let finalExpiry = new Date();
+    const daysToAdd = type === 'trial' ? 1 : Number(data.days);
 
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assignments'), { 
-      requestId: reqId, 
-      clientEmail: email, 
-      user: data.u, 
-      pass: data.p, 
-      port: data.port, 
-      portAux: data.portAux, 
-      service: data.service, 
-      expiry: exp.toISOString(),
-      expiryNotified: false,
-      isOnline: false 
-    });
-    
+    // LOGIC: Check if this is a renewal and if the existing assignment exists
+    if (type === 'renewal' && vpnId) {
+      const existingAsgn = assignments.find(a => a.requestId === vpnId);
+      
+      if (existingAsgn) {
+        // Find existing expiry: kung hindi pa expired, add sa current expiry. 
+        // Kung expired na, add sa date ngayon.
+        const currentExp = new Date(existingAsgn.expiry);
+        const baseDate = currentExp > new Date() ? currentExp : new Date();
+        baseDate.setDate(baseDate.getDate() + daysToAdd);
+        finalExpiry = baseDate;
+
+        // UPDATE existing document instead of adding new
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assignments', existingAsgn.id), {
+          expiry: finalExpiry.toISOString(),
+          expiryNotified: false,
+          // Update details din para sigurado kung binago ni Admin ang ports/pass
+          user: data.u,
+          pass: data.p,
+          port: data.port,
+          portAux: data.portAux
+        });
+      }
+    } else {
+      // NEW or TRIAL logic (Existing logic)
+      finalExpiry.setDate(finalExpiry.getDate() + daysToAdd);
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assignments'), { 
+        requestId: reqId, 
+        clientEmail: email, 
+        user: data.u, 
+        pass: data.p, 
+        port: data.port, 
+        portAux: data.portAux, 
+        service: data.service, 
+        expiry: finalExpiry.toISOString(),
+        expiryNotified: false,
+        isOnline: false 
+      });
+    }
+
+    // Mark the request as assigned
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { status: 'assigned' });
     
+    // Notify client via email
     sendEmail(
       email, 
-      "SwifftNet: Nodes Assigned! 🚀", 
-      `Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
+      type === 'renewal' ? "SwifftNet: Node Renewed! ⏳" : "SwifftNet: Nodes Assigned! 🚀", 
+      type === 'renewal' 
+        ? `Your node has been extended. New expiry: ${finalExpiry.toLocaleDateString()}`
+        : `Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
     );
+    
+    alert(type === 'renewal' ? "Assignment Updated (Renewed)" : "New Assignment Created");
   };
 
   const createTicket = async (e) => {
@@ -482,6 +566,7 @@ export default function App() {
   if (view === 'dashboard' && user) {
     const bal = getUserBalance(user.email);
     const myReqs = requests.filter(r => r.email === user.email);
+    const myPayments = payments.filter(p => p.email === user.email).sort((a,b) => new Date(b.date) - new Date(a.date));
     const hasTrialUsed = myReqs.some(r => r.type === 'trial');
     const isAccountNew = (new Date().getTime() - new Date(user.createdAt).getTime()) < (24 * 60 * 60 * 1000); 
 
@@ -544,6 +629,7 @@ export default function App() {
               <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase font-mono italic mt-12"><IconShield /> Remote Instances</h2>
               {myReqs.filter(r => r.type === 'new' || r.type === 'trial' || r.type === 'renewal').map((req) => {
                 const asgn = assignments.find(a => a.requestId === req.id);
+                const hasPendingRenewal = requests.some(r => r.vpnId === req.id && r.status === 'pending');
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 const isOnline = asgn?.isOnline === true;
@@ -555,6 +641,23 @@ export default function App() {
                         {!isExpired && (asgn) && (<div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />)}
                         <span className="text-[10px] font-black text-slate-500 uppercase font-mono">ID: {req.id.slice(-6)} | {protocol.toUpperCase()}</span>
                       </div>
+                      {/* RENEW ANYTIME BUTTON */}
+                      {/* RENEW ANYTIME BUTTON - Ngayon ay mawawala na kung may pending na */}
+                      {req.status === 'active' && !isExpired && !hasPendingRenewal && (
+                        <button 
+                          onClick={() => processAutoRenewal(req.id)}
+                          className="bg-emerald-600/10 text-emerald-500 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all mr-4"
+                        >
+                          Renew +1 Year
+                        </button>
+                      )}
+
+                      {/* OPTIONAL: Magpakita ng "Renewal Pending" text para alam ng user na natanggap ang request */}
+                      {hasPendingRenewal && (
+                        <span className="text-orange-500 text-[9px] font-black uppercase italic mr-4 animate-pulse">
+                          Renewal Pending...
+                        </span>
+                      )}
                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
                         {isExpired ? 'EXPIRED' : isOnline ? 'CONNECTED' : req.status}
                       </span>
@@ -563,7 +666,7 @@ export default function App() {
                       {isExpired ? (
                         <div className="text-center space-y-6">
                           <p className="text-slate-400 font-bold italic">Node has expired. Please renew.</p>
-                          {bal >= VPN_PRICE ? (<button onClick={() => createVpnRequest('renewal', req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
+                          {bal >= VPN_PRICE ? (<button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
@@ -616,6 +719,34 @@ export default function App() {
                   <button className="w-full bg-emerald-600 py-6 rounded-3xl font-black uppercase">Confirm Deposit</button>
                 </form>
               </div>
+              {/* Recent History Section */}
+              <div className="pt-8 border-t border-slate-800 space-y-6">
+                <div className="flex items-center gap-3 text-slate-400">
+                  <IconHistory />
+                  <h3 className="font-black text-[10px] uppercase tracking-widest italic">Recent History</h3>
+                </div>
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {myPayments.length === 0 ? (
+                    <p className="text-[10px] text-slate-600 italic uppercase text-center py-4">No transactions found</p>
+                  ) : myPayments.map((p) => (
+                    <div key={p.id} className="bg-black/40 p-4 rounded-2xl border border-slate-800 flex justify-between items-center group hover:border-slate-700 transition-all">
+                      <div>
+                        <p className="text-sm font-black text-white">₱{p.amount}</p>
+                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-tight">Ref: {p.refNo}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-[9px] font-black uppercase ${
+                          p.status === 'confirmed' ? 'text-emerald-500' : 
+                          p.status === 'denied' ? 'text-red-500' : 'text-orange-500'
+                        }`}>
+                          {p.status}
+                        </p>
+                        <p className="text-[8px] text-slate-600 font-black mt-1 italic">{p.date}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -637,7 +768,7 @@ export default function App() {
           </header>
 
           {adminTab === 'payments' && (<div className="grid md:grid-cols-3 gap-10">{payments.filter(p => p.status === 'pending').map(p => (<div key={p.id} className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95"><p className="font-black text-blue-400 text-sm truncate italic">{p.email}</p><div className="bg-black/40 p-8 rounded-[30px] text-center border border-slate-800"><p className="text-4xl font-black mb-2">₱{p.amount}</p><p className="text-[10px] text-slate-600 font-black">REF: {p.refNo}</p></div><div className="flex gap-4"><button onClick={() => updatePaymentStatus(p.id, 'confirmed', p.email)} className="flex-1 bg-emerald-600 py-5 rounded-2xl text-[10px] font-black uppercase">APPROVE</button><button onClick={() => updatePaymentStatus(p.id, 'denied', p.email)} className="flex-1 bg-red-600/20 text-red-500 py-5 rounded-2xl text-[10px] font-black uppercase">DENY</button></div></div>))}</div>)}
-          {adminTab === 'requests' && (<div className="grid md:grid-cols-2 gap-12">{requests.filter(r => r.status === 'pending').map(r => (<div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 border-slate-800`}><p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p><form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), portAux: fd.get('portAux'), service: r.service || 'winbox' }, r.type); }} className="space-y-6"><input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" /><div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div><div className="grid grid-cols-2 gap-4"><input name="port" placeholder="Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800" /><input name="portAux" placeholder="Port 2 (SSH/API)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800" /></div><button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button></form></div>))}</div>)}
+          {adminTab === 'requests' && (<div className="grid md:grid-cols-2 gap-12">{requests.filter(r => r.status === 'pending').map(r => (<div key={r.id} className={`bg-slate-900 p-12 rounded-[60px] border shadow-2xl space-y-8 animate-in slide-in-from-left-4 border-slate-800`}><p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6">{r.email}</p><form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); adminAssignTunnel(r.id, r.email, { days: fd.get('d'), u: fd.get('u'), p: fd.get('p'), port: fd.get('port'), portAux: fd.get('portAux'), service: r.service || 'winbox' }, r.type, r.vpnId); }} className="space-y-6"><input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" /><div className="grid grid-cols-2 gap-4"><input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /><input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" /></div><div className="grid grid-cols-2 gap-4"><input name="port" placeholder="Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800" /><input name="portAux" placeholder="Port 2 (SSH/API)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800" /></div><button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase shadow-2xl hover:bg-blue-500 transition-all">Authorize Node</button></form></div>))}</div>)}
           {adminTab === 'tickets' && (
             <div className="grid md:grid-cols-3 gap-8">
               {tickets.filter(t => t.status !== 'closed').sort((a,b) => new Date(b.lastUpdate) - new Date(a.lastUpdate)).map(t => (
