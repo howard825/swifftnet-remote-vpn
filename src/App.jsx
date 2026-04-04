@@ -31,6 +31,7 @@ import { 
  * --- BUSINESS CONFIGURATION ---
  */
 const VPN_PRICE = 200;
+const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
 const INTERGRAM_ID = "5631296198"; 
@@ -87,6 +88,11 @@ export default function App() {
   const [requestService, setRequestService] = useState("winbox");
   const [vpnProtocol, setVpnProtocol] = useState("l2tp"); 
   const [clientNote, setClientNote] = useState("");
+
+  //PROMO STATES
+  const [promos, setPromos] = useState([]);
+  const [promoInput, setPromoInput] = useState("");
+  const [isPromoValid, setIsPromoValid] = useState(false);
 
   const [payments, setPayments] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -201,6 +207,10 @@ export default function App() {
     return onSnapshot(mQuery, (s) => setMessages(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [activeTicket]);
 
+  // 5. PROMOS listener (I-paste ito sa ilalim ng Tickets listener)
+  const promoCol = collection(db, ...base, 'promos');
+  onSnapshot(promoCol, (s) => setPromos(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
   // --- AUTO-EXPIRY WATCHER ---
   useEffect(() => {
     if (user?.role !== 'admin' || !assignments.length) return;
@@ -270,12 +280,16 @@ export default function App() {
 
   // --- BASE HANDLERS ---
   const getUserBalance = (email) => {
-    const deposits = payments
-      .filter(p => p.email === email && p.status === 'confirmed')
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const spent = requests.filter(r => r.email === email && r.type !== 'trial' && r.status !== 'denied').length * VPN_PRICE;
-    return deposits - spent;
-  };
+  const deposits = payments
+    .filter(p => p.email === email && p.status === 'confirmed')
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  
+  const spent = requests
+    .filter(r => r.email === email && r.type !== 'trial' && r.status !== 'denied')
+    .reduce((sum, r) => sum + (r.pricePaid || VPN_PRICE), 0); // Binabasa nito kung 150 o 200 ang binayad
+    
+  return deposits - spent;
+};
 
   const getAllClients = () => Array.from(new Set([...payments.map(p => p.email), ...requests.map(r => r.email)]));
 
@@ -292,6 +306,26 @@ export default function App() {
       }
     } catch (err) { setAuthError(err.message); }
   };
+
+  const validatePromo = () => {
+  const found = promos.find(p => p.code.toUpperCase() === promoInput.toUpperCase());
+  if (found) {
+    setIsPromoValid(true);
+    alert("Promo Applied! Price is now ₱150.");
+  } else {
+    setIsPromoValid(false);
+    alert("Invalid Promo Code.");
+  }
+};
+
+const createPromoCode = async (code) => {
+  if(!code) return;
+  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'promos'), { code: code.toUpperCase() });
+};
+
+const deletePromoCode = async (id) => {
+  await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'promos', id));
+};
 
   const handleGoogleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); } catch (err) { setAuthError(err.message); }
@@ -363,16 +397,27 @@ export default function App() {
   };
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
-    const balance = getUserBalance(user.email);
-    if (balance >= VPN_PRICE) {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-        email: user.email, status: 'pending', type, vpnId, service: requestService, protocol: vpnProtocol, 
-        note: clientNote || (type === 'renewal' ? "Renewal" : ""), date: new Date().toLocaleDateString()
-      });
-      setClientNote("");
-      sendEmail(ADMIN_EMAIL, `New Node Request`, `User: ${user.email}\nService: ${requestService}`);
-    } else { alert("Insufficient balance."); }
-  };
+  const currentPrice = isPromoValid ? PROMO_PRICE : VPN_PRICE;
+  const balance = getUserBalance(user.email);
+  
+  if (balance >= currentPrice) {
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
+      email: user.email, 
+      status: 'pending', 
+      type, 
+      vpnId, 
+      service: requestService, 
+      protocol: vpnProtocol, 
+      pricePaid: currentPrice, // Sine-save ang presyong binayaran
+      note: (isPromoValid ? "[PROMO] " : "") + (clientNote || (type === 'renewal' ? "Renewal" : "")), 
+      date: new Date().toLocaleDateString()
+    });
+    setClientNote("");
+    setIsPromoValid(false); // Reset promo after buy
+    setPromoInput("");
+    sendEmail(ADMIN_EMAIL, `New Node Request`, `User: ${user.email}\nPrice: ₱${currentPrice}`);
+  } else { alert(`Insufficient balance. You need ₱${currentPrice}.`); }
+};
 
   const createTrialRequest = async () => {
     // 1. Check kung may trial na sa listahan
@@ -657,6 +702,10 @@ if (view === 'dashboard' && user) {
                 <option value="sstp">SSTP</option>
               </select>
               <input value={clientNote} onChange={(e) => setClientNote(e.target.value)} placeholder="Note..." className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none" />
+              <div className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
+                <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="Promo?" className="bg-transparent px-2 outline-none text-[10px] uppercase font-black w-20" />
+                <button onClick={validatePromo} className="bg-slate-800 hover:bg-emerald-600 px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all">Apply</button>
+              </div>
               {bal >= VPN_PRICE ? (
                 <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap">Buy Node</button>
               ) : (
@@ -846,7 +895,7 @@ if (view === 'admin' && user) {
         <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
           <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
           <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-x-auto">
-            {['payments', 'requests', 'tickets', 'clients'].map(tab => (
+            {['payments', 'requests', 'tickets', 'clients', 'promos'].map(tab => (
               <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
             ))}
             <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard</button>
@@ -952,6 +1001,26 @@ if (view === 'admin' && user) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {adminTab === 'promos' && (
+          <div className="max-w-md mx-auto space-y-8">
+            <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 shadow-2xl">
+              <h2 className="text-sm font-black uppercase mb-6 text-blue-500 italic">Reseller Promo Manager</h2>
+              <form onSubmit={(e) => { e.preventDefault(); createPromoCode(e.target.promo.value); e.target.reset(); }} className="flex gap-4">
+                <input name="promo" placeholder="CODE150" className="flex-1 bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-black" />
+                <button className="bg-blue-600 px-6 rounded-2xl font-black uppercase text-[10px]">Add</button>
+              </form>
+            </div>
+            <div className="space-y-4">
+              {promos.map(p => (
+                <div key={p.id} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex justify-between items-center">
+                  <span className="font-black text-emerald-500 tracking-widest">{p.code}</span>
+                  <button onClick={() => deletePromoCode(p.id)} className="text-red-500 text-[10px] font-black uppercase">Delete</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
