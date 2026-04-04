@@ -34,6 +34,7 @@ const VPN_PRICE = 200;
 const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
+const base = ['artifacts', appId, 'public', 'data'];
 const INTERGRAM_ID = "5631296198"; 
 
 const EJS_SERVICE_ID = "service_7s9tg36"; 
@@ -320,11 +321,15 @@ export default function App() {
 
 const createPromoCode = async (code) => {
   if(!code) return;
-  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'promos'), { code: code.toUpperCase() });
+  // Gagamit na tayo ng spread operator (...) sa base
+  await addDoc(collection(db, ...base, 'promos'), { 
+    code: code.toUpperCase() 
+  });
 };
 
 const deletePromoCode = async (id) => {
-  await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'promos', id));
+  // Siguraduhin na doc(db, ...base, 'promos', id) ang format
+  await deleteDoc(doc(db, ...base, 'promos', id));
 };
 
   const handleGoogleLogin = async () => {
