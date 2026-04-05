@@ -31,7 +31,7 @@ import { 
  * --- BUSINESS CONFIGURATION ---
  */
 const VPN_PRICE = 200;
-const PROMO_PRICE = 120;
+const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
 const base = ['artifacts', appId, 'public', 'data'];
