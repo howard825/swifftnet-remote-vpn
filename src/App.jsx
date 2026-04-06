@@ -672,6 +672,7 @@ const deletePromoCode = async (id) => {
   }
 // --- VIEW: DASHBOARD ---
 // --- VIEW: DASHBOARD ---
+// --- VIEW: DASHBOARD (FULL WIDTH FIX) ---
 if (view === 'dashboard' && user) {
   const bal = getUserBalance(user.email);
   const myReqs = requests.filter(r => r.email === user.email);
@@ -680,114 +681,72 @@ if (view === 'dashboard' && user) {
   const isAccountNew = (new Date().getTime() - new Date(user.createdAt).getTime()) < (24 * 60 * 60 * 1000);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans">
-      <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans">
+      {/* Container: Ginawa nating w-full at tinanggal ang max-w-7xl para sagad sa gilid */}
+      <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-8 rounded-[40px] border border-slate-800 gap-6 shadow-xl">
+        <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-6 md:p-8 rounded-[30px] md:rounded-[40px] border border-slate-800 gap-6 shadow-xl">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center font-black text-2xl uppercase border-4 border-blue-600">{user.name[0]}</div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1>
-              <div className="flex items-center gap-2 mt-2">
-                <p className="text-xs text-slate-500 font-bold uppercase">{user.email}</p>
-                <button onClick={handleUpdateEmail} className="text-slate-700 hover:text-blue-500 transition-colors" title="Change Email"><IconEdit /></button>
-              </div>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase leading-none">{user.name}</h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">{user.email}</p>
             </div>
           </div>
-          <div className="flex gap-4">
-            <button onClick={openSupport} className="flex items-center gap-2 bg-slate-800 hover:bg-blue-600 text-white font-black text-[10px] uppercase px-6 py-3 rounded-2xl transition-all border border-slate-700"><IconTelegram /> Support</button>
-            {user.role === 'admin' && <button onClick={() => setView('admin')} className="bg-blue-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase">Admin Panel</button>}
-            <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600 text-white font-black text-xs uppercase px-10 py-3 rounded-2xl transition-all">Sign Out</button>
+          <div className="flex gap-4 w-full md:w-auto">
+            <button onClick={openSupport} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase"><IconTelegram /> Support</button>
+            <button onClick={handleLogout} className="flex-1 md:flex-none bg-slate-800 hover:bg-red-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase">Sign Out</button>
           </div>
         </header>
 
-        {/* TOP STATS CARDS */}
-        <div className="grid md:grid-cols-4 gap-8">
+        {/* TOP SECTION: Grid na nag-aadjust para mapuno ang screen */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          {/* 1. BALANCE CARD */}
-          <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
+          {/* BALANCE CARD */}
+          <div className="bg-blue-600/10 border border-blue-500/20 p-8 md:p-10 rounded-[30px] md:rounded-[40px] text-center shadow-xl">
             <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
-            <p className="text-5xl font-black">₱{bal}</p>
+            <p className="text-4xl md:text-5xl font-black">₱{bal}</p>
           </div>
 
-          {/* 2. DYNAMIC PRICE CARD */}
-          <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
-            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">
-              {serviceCategory === 'remote' ? 'Remote Access' : 'Internet VPN'} Price
-            </p>
-            <p className="text-4xl font-black text-emerald-500">
-              ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}
-            </p>
-            {isPromoValid && <p className="text-[10px] text-blue-400 font-bold uppercase animate-pulse">Promo Applied!</p>}
-            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">
-              {serviceCategory === 'remote' ? 'Per Node / Year' : 'Per Account / Month'}
-            </p>
+          {/* PRICE CARD */}
+          <div className="bg-slate-900/50 border border-slate-800 p-8 md:p-10 rounded-[30px] md:rounded-[40px] text-center shadow-xl">
+            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Internet VPN Price</p>
+            <p className="text-3xl md:text-4xl font-black text-emerald-500">₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}</p>
+            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Account / Month</p>
           </div>
 
-          {/* 3. TRIAL CARD (Visible only for new accounts) */}
-          {!hasTrialUsed && isAccountNew ? (
-            <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
-              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">24-Hour Trial</p>
-              <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Claim Trial</button>
-            </div>
-          ) : (
-            /* Fill the gap if trial is not shown to keep the 4-column look, or let the next card span */
-            <div className="hidden md:block"></div>
-          )}
-
-          {/* 4. SERVICE SELECTOR & BUY SECTION (Spans 2 columns on medium screens) */}
-          <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
-            
-            {/* CATEGORY TOGGLE (Remote vs Internet) */}
-            <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
-              <button 
-                onClick={() => setServiceCategory('remote')}
-                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'remote' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-400'}`}
-              >
-                Remote Access
-              </button>
-              <button 
-                onClick={() => setServiceCategory('internet')}
-                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'internet' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-400'}`}
-              >
-                Internet VPN
-              </button>
+          {/* SERVICE SELECTOR: Ginawa nating col-span-2 para mapuno ang row sa laptop */}
+          <div className="md:col-span-2 bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-[30px] md:rounded-[40px] flex flex-col items-stretch justify-center gap-6 shadow-xl">
+            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+              <button onClick={() => setServiceCategory('remote')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'remote' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>Remote Access</button>
+              <button onClick={() => setServiceCategory('internet')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'internet' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`}>Internet VPN</button>
             </div>
 
-            {/* CONFIGURATION ROW */}
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              <select value={requestService} onChange={(e) => setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-center">
+              <select value={requestService} onChange={(e) => setRequestService(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-blue-400 outline-none">
                 <option value="winbox">Winbox</option>
                 {serviceCategory === 'internet' && <option value="internet">Internet Only</option>}
                 <option value="api">API</option>
                 <option value="ssh">SSH</option>
               </select>
 
-              <select value={vpnProtocol} onChange={(e) => setVpnProtocol(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-emerald-400 outline-none cursor-pointer">
+              <select value={vpnProtocol} onChange={(e) => setVpnProtocol(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-emerald-400 outline-none">
                 <option value="l2tp">L2TP</option>
                 <option value="sstp">SSTP</option>
               </select>
 
-              <div className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800 flex-1 w-full">
+              <div className="flex gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800 sm:col-span-1">
                 <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="PROMO?" className="bg-transparent px-3 outline-none text-[10px] uppercase font-black w-full" />
-                <button onClick={validatePromo} className="bg-slate-800 hover:bg-emerald-600 px-4 py-2 rounded-xl text-[8px] font-black uppercase transition-all">Apply</button>
+                <button onClick={validatePromo} className="bg-slate-800 px-4 py-2 rounded-lg text-[8px] font-black uppercase">Apply</button>
               </div>
 
-              {/* ACTION BUTTON */}
-              {bal >= (isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)) ? (
-                <button 
-                  onClick={() => createVpnRequest('new')} 
-                  className="w-full lg:w-auto bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap"
-                >
-                  Buy {serviceCategory === 'remote' ? 'Node' : 'Monthly'} (₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)})
-                </button>
-              ) : (
-                <div className="flex flex-col items-center px-4">
-                  <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>
-                  <span className="text-slate-600 text-[8px] font-bold uppercase mt-1">Need ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}</span>
-                </div>
-              )}
+              <button 
+                onClick={() => createVpnRequest('new')} 
+                className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-[10px] uppercase shadow-2xl transition-all"
+              >
+                Buy Monthly (₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)})
+              </button>
             </div>
           </div>
         </div>
