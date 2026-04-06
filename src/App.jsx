@@ -404,6 +404,8 @@ const deletePromoCode = async (id) => {
   const createVpnRequest = async (type = 'new', vpnId = null) => {
   const currentPrice = isPromoValid ? PROMO_PRICE : VPN_PRICE;
   const balance = getUserBalance(user.email);
+
+  console.log("Processing request with price:", currentPrice); // Debugging tool
   
   if (balance >= currentPrice) {
     // Hanapin muna natin yung promo ID bago i-delete
@@ -698,7 +700,6 @@ if (view === 'dashboard' && user) {
             <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
             <p className="text-5xl font-black">₱{bal}</p>
           </div>
-          // Hanapin ito sa Dashboard view:
           <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
             <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Node Price</p>
             {/* Palitan ang line sa ibaba: */}
@@ -730,9 +731,18 @@ if (view === 'dashboard' && user) {
                 <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="Promo?" className="bg-transparent px-2 outline-none text-[10px] uppercase font-black w-20" />
                 <button onClick={validatePromo} className="bg-slate-800 hover:bg-emerald-600 px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all">Apply</button>
               </div>
-              {bal >= VPN_PRICE ? (
-                <button onClick={() => createVpnRequest('new')} className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap">Buy Node</button>
+              {bal >= (isPromoValid ? PROMO_PRICE : VPN_PRICE) ? (
+                <button 
+                  onClick={() => createVpnRequest('new')} 
+                  className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap"
+                >
+                  Buy Node (₱{isPromoValid ? PROMO_PRICE : VPN_PRICE})
+                </button>
               ) : (
+                <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">
+                  Need ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE} to Buy
+                </span>
+              )}
                 <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>
               )}
             </div>
