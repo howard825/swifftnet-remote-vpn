@@ -411,8 +411,8 @@ const deletePromoCode = async (id) => {
   };
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
+  // 1. Kailangan i-define ang price at balance SA LOOB ng function na ito
   const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
-  const canAfford = bal >= currentPrice;
   const balance = getUserBalance(user.email);
   
   if (balance >= currentPrice) {
@@ -422,7 +422,7 @@ const deletePromoCode = async (id) => {
       email: user.email, 
       status: 'pending', 
       type, 
-      category: serviceCategory, // ETO ANG DADAGDAG NATIN
+      category: serviceCategory,
       vpnId, 
       service: requestService, 
       protocol: vpnProtocol, 
@@ -432,10 +432,8 @@ const deletePromoCode = async (id) => {
       date: new Date().toLocaleDateString()
     });
 
-    // --- ETO ANG FIX PARA SA SINGLE-USE ---
     if (isPromoValid && promoDoc) {
       await deleteDoc(doc(db, ...base, 'promos', promoDoc.id));
-      console.log("Promo consumed and deleted.");
     }
 
     setClientNote("");
@@ -676,9 +674,10 @@ const deletePromoCode = async (id) => {
 // --- VIEW: DASHBOARD (FULL WIDTH FIX) ---
 if (view === 'dashboard' && user) {
   const bal = getUserBalance(user.email);
+  const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
+  const canAfford = bal >= currentPrice;
   const myReqs = requests.filter(r => r.email === user.email);
   const myPayments = payments.filter(p => p.email === user.email).sort((a, b) => new Date(b.date) - new Date(a.date));
-  const canAfford = bal >= currentPrice;
   const hasTrialUsed = myReqs.some(r => r.type === 'trial');
   const isAccountNew = (new Date().getTime() - new Date(user.createdAt).getTime()) < (24 * 60 * 60 * 1000);
 
