@@ -739,11 +739,14 @@ if (view === 'dashboard' && user) {
                   Buy Node (₱{isPromoValid ? PROMO_PRICE : VPN_PRICE})
                 </button>
               ) : (
-                <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">
-                  Need ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE} to Buy
-                </span>
-              )}
-                <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>
+                <div className="flex flex-col items-center">
+                  <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">
+                    Insufficient Balance
+                  </span>
+                  <span className="text-slate-600 text-[8px] font-bold uppercase">
+                    Need ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE}
+                  </span>
+                </div>
               )}
             </div>
           </div>
