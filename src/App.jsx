@@ -678,6 +678,7 @@ if (view === 'dashboard' && user) {
   const bal = getUserBalance(user.email);
   const myReqs = requests.filter(r => r.email === user.email);
   const myPayments = payments.filter(p => p.email === user.email).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const canAfford = bal >= currentPrice;
   const hasTrialUsed = myReqs.some(r => r.type === 'trial');
   const isAccountNew = (new Date().getTime() - new Date(user.createdAt).getTime()) < (24 * 60 * 60 * 1000);
 
