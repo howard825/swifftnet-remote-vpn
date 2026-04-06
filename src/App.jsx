@@ -31,6 +31,7 @@ import { 
  * --- BUSINESS CONFIGURATION ---
  */
 const VPN_PRICE = 200;
+const INTERNET_VPN_PRICE = 300; // Internet VPN (Monthly)
 const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
@@ -82,6 +83,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [serviceCategory, setServiceCategory] = useState("remote"); // "remote" or "internet"
   
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailInput, setEmailInput] = useState("");
@@ -352,11 +354,17 @@ const deletePromoCode = async (id) => {
 
   const processAutoRenewal = async (vpnId) => {
     const balance = getUserBalance(user.email);
+
+    // Hanapin muna kung anong category yung nire-renew
+    const targetReq = requests.find(r => r.id === vpnId || r.vpnId === vpnId);
+    const isInternet = targetReq?.category === 'internet';
+    const priceToCharge = isInternet ? INTERNET_VPN_PRICE : VPN_PRICE;
+    const daysToAdd = isInternet ? 30 : 365; // Monthly vs Yearly
     
-    if (balance < VPN_PRICE) {
-      alert("Insufficient balance for auto-renewal.");
-      return;
-    }
+    if (balance < priceToCharge) {
+      alert(`Insufficient balance. You need ₱${priceToCharge}.`);
+      return;
+    }
 
     const existingAsgn = assignments.find(a => a.requestId === vpnId);
     if (!existingAsgn) {
@@ -368,7 +376,7 @@ const deletePromoCode = async (id) => {
       // 1. Calculate New Expiry
       const currentExp = new Date(existingAsgn.expiry);
       const baseDate = currentExp > new Date() ? currentExp : new Date();
-      baseDate.setDate(baseDate.getDate() + 365);
+      baseDate.setDate(baseDate.getDate() + daysToAdd);
       const newExpiry = baseDate.toISOString();
 
       // 2. Update the Assignment directly
@@ -388,12 +396,13 @@ const deletePromoCode = async (id) => {
         date: new Date().toLocaleDateString()
       });
 
-      // 4. Notifications
-      sendEmail(user.email, "SwifftNet: Renewal Successful! ✅", 
-        `Your VPN FOR REMOTE ACCESS has been auto-renewed for 1 year. New expiry: ${baseDate.toLocaleDateString()}`);
-      
-      sendEmail(ADMIN_EMAIL, `Alert: Auto-Renewal Paid (${user.email})`, 
-        `User ${user.email} auto-renewed Node ${existingAsgn.port}. ₱${VPN_PRICE} deducted.`);
+      // 4. Notificationssh
+      // Sa loob ng try block ng processAutoRenewal:
+      sendEmail(user.email, "SwifftNet: Renewal Successful! ✅", 
+        `Your ${isInternet ? 'Internet VPN' : 'Remote Access Node'} has been auto-renewed for ${isInternet ? '30 days' : '1 year'}. New expiry: ${baseDate.toLocaleDateString()}`);
+
+      sendEmail(ADMIN_EMAIL, `Alert: Auto-Renewal Paid (${user.email})`, 
+        `User ${user.email} auto-renewed ${isInternet ? 'Internet VPN' : 'Node ' + existingAsgn.port}. ₱${priceToCharge} deducted.`);
 
       alert("Node successfully renewed for +1 year!");
     } catch (err) {
@@ -402,25 +411,23 @@ const deletePromoCode = async (id) => {
   };
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
-  const currentPrice = isPromoValid ? PROMO_PRICE : VPN_PRICE;
+  const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
   const balance = getUserBalance(user.email);
-
-  console.log("Processing request with price:", currentPrice); // Debugging tool
   
   if (balance >= currentPrice) {
-    // Hanapin muna natin yung promo ID bago i-delete
     const promoDoc = promos.find(p => p.code.toUpperCase() === promoInput.toUpperCase());
 
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
       email: user.email, 
       status: 'pending', 
       type, 
+      category: serviceCategory, // ETO ANG DADAGDAG NATIN
       vpnId, 
       service: requestService, 
       protocol: vpnProtocol, 
       pricePaid: currentPrice,
-      promoUsed: isPromoValid ? promoInput.toUpperCase() : "NONE", // Para makita ng Admin
-      note: (isPromoValid ? `[PROMO: ${promoInput.toUpperCase()}] ` : "") + (clientNote || (type === 'renewal' ? "Renewal" : "")), 
+      promoUsed: isPromoValid ? promoInput.toUpperCase() : "NONE",
+      note: clientNote || (serviceCategory === 'internet' ? "Internet VPN Subscription" : "Remote Access"), 
       date: new Date().toLocaleDateString()
     });
 
@@ -455,6 +462,7 @@ const deletePromoCode = async (id) => {
         email: user.email,
         status: 'pending',
         type: 'trial',
+        category: serviceCategory,
         service: requestService, 
         protocol: vpnProtocol,  
         note: "Free Trial Request",
@@ -470,7 +478,7 @@ const deletePromoCode = async (id) => {
     }
   };
 
-  const adminAssignTunnel = async (reqId, email, data, type, vpnId = null) => {
+  const adminAssignTunnel = async (reqId, email, data, type, vpnId = null, category = 'remote') => {
     let finalExpiry = new Date();
     const daysToAdd = type === 'trial' ? 1 : Number(data.days);
 
@@ -696,56 +704,88 @@ if (view === 'dashboard' && user) {
 
         {/* TOP STATS CARDS */}
         <div className="grid md:grid-cols-4 gap-8">
+          
+          {/* 1. BALANCE CARD */}
           <div className="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[40px] text-center shadow-xl">
             <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
             <p className="text-5xl font-black">₱{bal}</p>
           </div>
+
+          {/* 2. DYNAMIC PRICE CARD */}
           <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
-            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Node Price</p>
-            {/* Palitan ang line sa ibaba: */}
+            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">
+              {serviceCategory === 'remote' ? 'Remote Access' : 'Internet VPN'} Price
+            </p>
             <p className="text-4xl font-black text-emerald-500">
-              ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE}
+              ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}
             </p>
             {isPromoValid && <p className="text-[10px] text-blue-400 font-bold uppercase animate-pulse">Promo Applied!</p>}
-            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Node / Year</p>
+            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">
+              {serviceCategory === 'remote' ? 'Per Node / Year' : 'Per Account / Month'}
+            </p>
           </div>
-          {!hasTrialUsed && isAccountNew && (
+
+          {/* 3. TRIAL CARD (Visible only for new accounts) */}
+          {!hasTrialUsed && isAccountNew ? (
             <div className="bg-indigo-600/20 border border-indigo-500/30 p-8 rounded-[40px] text-center flex flex-col items-center justify-center gap-4 animate-pulse">
               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">24-Hour Trial</p>
               <button onClick={createTrialRequest} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Claim Trial</button>
             </div>
+          ) : (
+            /* Fill the gap if trial is not shown to keep the 4-column look, or let the next card span */
+            <div className="hidden md:block"></div>
           )}
+
+          {/* 4. SERVICE SELECTOR & BUY SECTION (Spans 2 columns on medium screens) */}
           <div className={`bg-slate-900 border border-slate-800 p-8 rounded-[40px] flex flex-col items-stretch justify-center gap-6 ${(!hasTrialUsed && isAccountNew) ? 'md:col-span-1' : 'md:col-span-2 shadow-xl'}`}>
+            
+            {/* CATEGORY TOGGLE (Remote vs Internet) */}
+            <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+              <button 
+                onClick={() => setServiceCategory('remote')}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'remote' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-400'}`}
+              >
+                Remote Access
+              </button>
+              <button 
+                onClick={() => setServiceCategory('internet')}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'internet' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-400'}`}
+              >
+                Internet VPN
+              </button>
+            </div>
+
+            {/* CONFIGURATION ROW */}
             <div className="flex flex-col lg:flex-row gap-4 items-center">
               <select value={requestService} onChange={(e) => setRequestService(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-blue-400 outline-none cursor-pointer">
                 <option value="winbox">Winbox</option>
+                {serviceCategory === 'internet' && <option value="internet">Internet Only</option>}
                 <option value="api">API</option>
                 <option value="ssh">SSH</option>
               </select>
+
               <select value={vpnProtocol} onChange={(e) => setVpnProtocol(e.target.value)} className="w-full lg:w-auto bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-black uppercase text-emerald-400 outline-none cursor-pointer">
                 <option value="l2tp">L2TP</option>
                 <option value="sstp">SSTP</option>
               </select>
-              <input value={clientNote} onChange={(e) => setClientNote(e.target.value)} placeholder="Note..." className="flex-1 w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs font-medium outline-none" />
-              <div className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="Promo?" className="bg-transparent px-2 outline-none text-[10px] uppercase font-black w-20" />
-                <button onClick={validatePromo} className="bg-slate-800 hover:bg-emerald-600 px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all">Apply</button>
+
+              <div className="flex gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800 flex-1 w-full">
+                <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="PROMO?" className="bg-transparent px-3 outline-none text-[10px] uppercase font-black w-full" />
+                <button onClick={validatePromo} className="bg-slate-800 hover:bg-emerald-600 px-4 py-2 rounded-xl text-[8px] font-black uppercase transition-all">Apply</button>
               </div>
-              {bal >= (isPromoValid ? PROMO_PRICE : VPN_PRICE) ? (
+
+              {/* ACTION BUTTON */}
+              {bal >= (isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)) ? (
                 <button 
                   onClick={() => createVpnRequest('new')} 
-                  className="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap"
+                  className="w-full lg:w-auto bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl transition-all whitespace-nowrap"
                 >
-                  Buy Node (₱{isPromoValid ? PROMO_PRICE : VPN_PRICE})
+                  Buy {serviceCategory === 'remote' ? 'Node' : 'Monthly'} (₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)})
                 </button>
               ) : (
-                <div className="flex flex-col items-center">
-                  <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">
-                    Insufficient Balance
-                  </span>
-                  <span className="text-slate-600 text-[8px] font-bold uppercase">
-                    Need ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE}
-                  </span>
+                <div className="flex flex-col items-center px-4">
+                  <span className="text-red-500 text-[10px] font-black uppercase italic animate-pulse">Top-up Needed</span>
+                  <span className="text-slate-600 text-[8px] font-bold uppercase mt-1">Need ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}</span>
                 </div>
               )}
             </div>
@@ -785,7 +825,32 @@ if (view === 'dashboard' && user) {
                 const protocol = req.protocol || 'l2tp'; 
                 const isExpired = asgn ? new Date() > new Date(asgn.expiry) : false;
                 const isOnline = asgn?.isOnline === true;
-                const script = asgn ? `${protocol === 'l2tp' ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} use-ipsec=yes` : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-Remote user=${asgn.user} password=${asgn.pass} profile=default-encryption`}\n/ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.88.0/21\n/ip service\nset winbox address=192.168.88.0/21\nset api address=192.168.88.0/21\nset ssh address=192.168.88.0/21` : "";
+                const script = asgn ? (() => {
+                                                const protocol = req.protocol || 'l2tp';
+                                                const isInternet = req.category === 'internet'; // Check if it's the 300/mo service
+                                                
+                                                // COMMON: Tunnel Creation (L2TP or SSTP)
+                                                let baseScript = protocol === 'l2tp' 
+                                                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet-${isInternet ? 'Internet' : 'Remote'} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
+                                                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet-${isInternet ? 'Internet' : 'Remote'} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
+
+                                                if (isInternet) {
+                                                  // --- SCRIPT PARA SA INTERNET VPN (Monthly) ---
+                                                  return `${baseScript}
+                                              /ip route add dst-address=0.0.0.0/0 gateway=SwifftNet-Internet distance=1 check-gateway=ping
+                                              /ip firewall nat add chain=srcnat out-interface=SwifftNet-Internet action=masquerade comment="SwifftNet VPN Internet"`;
+                                                } else {
+                                                  // --- SCRIPT PARA SA REMOTE ACCESS (Yearly - Original Logic) ---
+                                                  return `${baseScript}
+                                              /ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.88.0/21
+                                              /ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.88.0/21
+                                              /ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.88.0/21
+                                              /ip service
+                                              set winbox address=192.168.88.0/21
+                                              set api address=192.168.88.0/21
+                                              set ssh address=192.168.88.0/21`;
+                                                }
+                                              })() : "";
 
                 return (
                   <div key={req.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-8 animate-in slide-in-from-left-4 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>
@@ -972,9 +1037,9 @@ if (view === 'admin' && user) {
                     port: fd.get('port'), 
                     portAux: fd.get('portAux'), 
                     service: r.service || 'winbox' 
-                  }, r.type, r.vpnId); 
+                  }, r.type, r.vpnId, r.category); 
                 }} className="space-y-6">
-                  <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : "365"} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
+                  <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : (r.category === 'internet' ? "30" : "365")} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none" />
                   <div className="grid grid-cols-2 gap-4">
                     <input name="u" placeholder="VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
                     <input name="p" placeholder="VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full outline-none" />
