@@ -203,16 +203,29 @@ export default function App() {
     onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
-  useEffect(() => {
-    if (!activeTicket || !db) return;
-    if (user.role === 'client' && activeTicket.status === 'answered') {
-    const tRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
-    updateDoc(tRef, { status: 'open' }).catch(err => console.error("Status Update Error:", err));
-  }
-    const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages');
-    const mQuery = query(mCol, orderBy('timestamp', 'asc'));
-    return onSnapshot(mQuery, (s) => setMessages(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-  }, [activeTicket]);
+  // Sa loob ng iyong main data listener useEffect:
+useEffect(() => {
+  if (!user || !db) return;
+  const base = ['artifacts', appId, 'public', 'data'];
+  
+  const tCol = collection(db, ...base, 'tickets');
+  const tQuery = user.role === 'admin' 
+    ? query(tCol, orderBy('lastUpdate', 'desc')) 
+    : query(tCol, where('clientEmail', '==', user.email), orderBy('lastUpdate', 'desc'));
+
+  const unsubscribe = onSnapshot(tQuery, (s) => {
+    const fetchedTickets = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    setTickets(fetchedTickets);
+
+    // FIX: I-update ang activeTicket state para laging fresh ang status at data
+    if (activeTicket) {
+      const updatedActive = fetchedTickets.find(t => t.id === activeTicket.id);
+      if (updatedActive) setActiveTicket(updatedActive);
+    }
+  });
+
+  return () => unsubscribe();
+}, [user, activeTicket?.id]); // Idagdag ang activeTicket.id sa dependencies
 
   // 5. PROMOS listener (I-paste ito sa ilalim ng Tickets listener)
   const promoCol = collection(db, ...base, 'promos');
@@ -564,29 +577,35 @@ const deletePromoCode = async (id) => {
 };
 
   const handleReply = async (e) => {
-    e.preventDefault();
-    if (!replyBody || !activeTicket) return;
+  e.preventDefault();
+  if (!replyBody.trim() || !activeTicket) return;
 
-    try {
-      const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
-      await addDoc(collection(ticketRef, 'messages'), {
-        sender: user.email,
-        text: replyBody,
-        timestamp: serverTimestamp()
-      });
+  try {
+    const ticketRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
+    
+    // 1. Add Message to Subcollection
+    await addDoc(collection(ticketRef, 'messages'), {
+      sender: user.email,
+      text: replyBody,
+      timestamp: serverTimestamp() // Importante ito
+    });
 
-      await updateDoc(ticketRef, {
-        lastUpdate: new Date().toISOString(),
-        status: user.role === 'admin' ? 'answered' : 'open'
-      });
+    // 2. Update Main Ticket Document
+    await updateDoc(ticketRef, {
+      lastUpdate: serverTimestamp(), // Consistent sorting
+      status: user.role === 'admin' ? 'answered' : 'open'
+    });
 
-      const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
-      sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
-      setReplyBody("");
-    } catch (err) {
-      alert(`Failed to send reply: ${err.message}`);
-    }
-  };
+    // 3. Email Notification (Gagana pa rin ito)
+    const notifyEmail = user.role === 'admin' ? activeTicket.clientEmail : ADMIN_EMAIL;
+    sendEmail(notifyEmail, `New Reply: ${activeTicket.subject}`, replyBody, activeTicket.id);
+    
+    setReplyBody("");
+  } catch (err) {
+    console.error("Reply Error:", err);
+    alert(`Failed to send: ${err.message}`);
+  }
+};
 
   const resendActivationEmail = (asgn) => {
     sendEmail(
