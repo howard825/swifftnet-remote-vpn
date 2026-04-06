@@ -412,6 +412,7 @@ const deletePromoCode = async (id) => {
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
   const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
+  const canAfford = bal >= currentPrice;
   const balance = getUserBalance(user.email);
   
   if (balance >= currentPrice) {
@@ -750,9 +751,14 @@ if (view === 'dashboard' && user) {
 
               <button 
                 onClick={() => createVpnRequest('new')} 
-                className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-[10px] uppercase shadow-2xl transition-all"
+                disabled={!canAfford} // ETO ANG FIX: Naka-disable kapag hindi sapat ang balance
+                className={`w-full py-4 rounded-xl font-black text-[10px] uppercase shadow-2xl transition-all ${
+                  canAfford 
+                  ? 'bg-blue-600 hover:bg-blue-500 cursor-pointer' 
+                  : 'bg-slate-800 text-slate-600 cursor-not-allowed' // Nagiging gray at hindi clickable
+                }`}
               >
-                Buy Monthly (₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)})
+                {canAfford ? `Buy ${serviceCategory === 'remote' ? 'Yearly' : 'Monthly'}` : 'Insufficient Balance'}
               </button>
             </div>
           </div>
@@ -842,7 +848,7 @@ if (view === 'dashboard' && user) {
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <div className="space-y-10">
-                          {req.status === 'assigned' && (<button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' })} className="w-full bg-emerald-600 text-white py-6 rounded-2xl font-black text-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase hover:bg-emerald-500 animate-bounce flex items-center justify-center gap-3"><IconCheck /> FINISHED DEPLOYMENT</button>)}
+                          {req.status === 'assigned' && !isExpired && <button onClick={async (e) => { e.preventDefault(); try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' }); } catch (err) { alert("Error: " + err.message); } }} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-xs shadow-lg uppercase hover:bg-emerald-500 animate-pulse">✅ FINISHED DEPLOYMENT</button>}
                           {req.status === 'active' && (<div className="bg-emerald-500/10 border border-emerald-500/30 p-8 rounded-[35px] space-y-5 animate-in fade-in zoom-in-95"><div className="flex items-center gap-3 text-emerald-400"><IconShield /><h3 className="font-black uppercase italic text-sm tracking-widest">Koneksyon Ready!</h3></div><p className="text-[13px] leading-relaxed text-slate-300 font-medium">Use <strong>Winbox</strong> or <strong>SSH</strong> to access your router.</p></div>)}
                           <div className="bg-black/60 p-10 rounded-[32px] border border-slate-800 font-mono text-sm text-slate-400 space-y-3 shadow-inner relative overflow-hidden">
                             <div className="flex justify-between py-1 border-b border-slate-800/50"><span>VPN User</span> <span className="text-white font-black">{asgn.user}</span></div>
