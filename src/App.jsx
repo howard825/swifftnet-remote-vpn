@@ -698,9 +698,14 @@ if (view === 'dashboard' && user) {
             <p className="text-blue-400 text-[10px] font-black uppercase mb-2">My Balance</p>
             <p className="text-5xl font-black">₱{bal}</p>
           </div>
+          // Hanapin ito sa Dashboard view:
           <div className="bg-slate-900/50 border border-slate-800 p-10 rounded-[40px] text-center shadow-xl">
             <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Node Price</p>
-            <p className="text-4xl font-black text-emerald-500">₱{VPN_PRICE}</p>
+            {/* Palitan ang line sa ibaba: */}
+            <p className="text-4xl font-black text-emerald-500">
+              ₱{isPromoValid ? PROMO_PRICE : VPN_PRICE}
+            </p>
+            {isPromoValid && <p className="text-[10px] text-blue-400 font-bold uppercase animate-pulse">Promo Applied!</p>}
             <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Node / Year</p>
           </div>
           {!hasTrialUsed && isAccountNew && (
