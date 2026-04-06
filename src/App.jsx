@@ -199,7 +199,7 @@ export default function App() {
 
     // 4. TICKETS listener
     const tCol = collection(db, ...base, 'tickets');
-    const tQuery = user.role === 'admin' ? tCol : query(tCol, where('clientEmail', '==', user.email));
+    const tQuery = user.role === 'admin' ? query(tCol, orderBy('lastUpdate', 'desc')) : query(tCol, where('clientEmail', '==', user.email), orderBy('lastUpdate', 'desc'));
     onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user]);
 
@@ -551,6 +551,7 @@ const deletePromoCode = async (id) => {
       text: `Support Request: ${ticketSubject}`,
       timestamp: serverTimestamp()
     });
+    setActiveTicket({ id: tRef.id, ...tData });
     sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`);
     setTicketSubject("");
   };
