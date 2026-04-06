@@ -586,6 +586,7 @@ const deletePromoCode = async (id) => {
     // 1. Add Message to Subcollection
     await addDoc(collection(ticketRef, 'messages'), {
       sender: user.email,
+      clientEmail: activeTicket.clientEmail,
       text: replyBody,
       timestamp: serverTimestamp() // Importante ito
     });
