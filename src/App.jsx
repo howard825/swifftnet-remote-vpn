@@ -697,6 +697,7 @@ if (view === 'dashboard' && user) {
           </div>
           <div className="flex gap-4 w-full md:w-auto">
             <button onClick={openSupport} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase"><IconTelegram /> Support</button>
+            {user.role === 'admin' && <button onClick={() => setView('admin')} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all">Admin Panel</button>}
             <button onClick={handleLogout} className="flex-1 md:flex-none bg-slate-800 hover:bg-red-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase">Sign Out</button>
           </div>
         </header>
