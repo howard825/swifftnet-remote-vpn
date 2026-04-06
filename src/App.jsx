@@ -205,6 +205,10 @@ export default function App() {
 
   useEffect(() => {
     if (!activeTicket || !db) return;
+    if (user.role === 'client' && activeTicket.status === 'answered') {
+    const tRef = doc(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id);
+    updateDoc(tRef, { status: 'open' }).catch(err => console.error("Status Update Error:", err));
+  }
     const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'tickets', activeTicket.id, 'messages');
     const mQuery = query(mCol, orderBy('timestamp', 'asc'));
     return onSnapshot(mQuery, (s) => setMessages(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -911,9 +915,20 @@ if (view === 'dashboard' && user) {
                     </form>
                     <div className="space-y-3 mt-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                       {tickets.map(t => (
-                        <div key={t.id} onClick={() => setActiveTicket(t)} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 cursor-pointer hover:border-emerald-500 transition-all">
-                          <p className="text-[10px] font-black uppercase mb-1 truncate">{t.subject}</p>
-                          <div className="flex justify-between items-center text-[7px] font-black"><span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span><span>{new Date(t.lastUpdate).toLocaleDateString()}</span></div>
+                        <div key={t.id} onClick={() => setActiveTicket(t)} className={`bg-slate-950 p-4 rounded-2xl border cursor-pointer transition-all relative group ${t.status === 'answered' ? 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-800 hover:border-blue-500'}`}>
+                          {/* BADGE: Indicator para sa client kung nag-reply si Admin */}
+                          {user.role === 'client' && t.status === 'answered' && (
+                            <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[7px] font-black px-2 py-1 rounded-full animate-bounce shadow-lg uppercase">New Reply</span>
+                          )}
+                          
+                          <p className={`text-[10px] font-black uppercase mb-1 truncate ${t.status === 'answered' ? 'text-emerald-400' : 'text-slate-300'}`}>{t.subject}</p>
+                          
+                          <div className="flex justify-between items-center text-[7px] font-black">
+                            <span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>
+                              {t.status === 'answered' ? '● ADMIN REPLIED' : t.status.toUpperCase()}
+                            </span>
+                            <span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
