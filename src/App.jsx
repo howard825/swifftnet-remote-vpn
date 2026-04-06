@@ -537,24 +537,27 @@ const deletePromoCode = async (id) => {
   };
 
   const createTicket = async (e) => {
-    e.preventDefault();
-    if (!ticketSubject) return;
-    const tRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets'), {
-      clientEmail: user.email,
-      subject: ticketSubject,
-      status: 'open',
-      createdAt: new Date().toISOString(),
-      lastUpdate: new Date().toISOString()
-    });
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tickets', tRef.id, 'messages'), {
-      sender: user.email,
-      text: `Support Request: ${ticketSubject}`,
-      timestamp: serverTimestamp()
-    });
+  e.preventDefault();
+  if (!ticketSubject.trim()) return;
+  try {
+    // 1. Declare tData first!
+    const tData = { clientEmail: user.email, subject: ticketSubject, status: 'open', createdAt: new Date().toISOString(), lastUpdate: new Date().toISOString() };
+    
+    // 2. Add to Firestore
+    const tRef = await addDoc(collection(db, ...base, 'tickets'), tData);
+    
+    // 3. Add initial message
+    await addDoc(collection(db, ...base, 'tickets', tRef.id, 'messages'), { sender: user.email, text: `Support Request: ${ticketSubject}`, timestamp: serverTimestamp() });
+
+    // 4. Set Active Ticket (Using the tData we declared above)
     setActiveTicket({ id: tRef.id, ...tData });
-    sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`);
-    setTicketSubject("");
-  };
+
+    sendEmail(ADMIN_EMAIL, "New Support Ticket", `User ${user.email} opened a ticket: ${ticketSubject}`);
+    setTicketSubject("");
+  } catch (err) { 
+    alert("Ticket Error: " + err.message); 
+  }
+};
 
   const handleReply = async (e) => {
     e.preventDefault();
