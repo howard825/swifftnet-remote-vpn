@@ -406,6 +406,9 @@ const deletePromoCode = async (id) => {
   const balance = getUserBalance(user.email);
   
   if (balance >= currentPrice) {
+    // Hanapin muna natin yung promo ID bago i-delete
+    const promoDoc = promos.find(p => p.code.toUpperCase() === promoInput.toUpperCase());
+
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
       email: user.email, 
       status: 'pending', 
@@ -413,15 +416,26 @@ const deletePromoCode = async (id) => {
       vpnId, 
       service: requestService, 
       protocol: vpnProtocol, 
-      pricePaid: currentPrice, // Sine-save ang presyong binayaran
-      note: (isPromoValid ? "[PROMO] " : "") + (clientNote || (type === 'renewal' ? "Renewal" : "")), 
+      pricePaid: currentPrice,
+      promoUsed: isPromoValid ? promoInput.toUpperCase() : "NONE", // Para makita ng Admin
+      note: (isPromoValid ? `[PROMO: ${promoInput.toUpperCase()}] ` : "") + (clientNote || (type === 'renewal' ? "Renewal" : "")), 
       date: new Date().toLocaleDateString()
     });
+
+    // --- ETO ANG FIX PARA SA SINGLE-USE ---
+    if (isPromoValid && promoDoc) {
+      await deleteDoc(doc(db, ...base, 'promos', promoDoc.id));
+      console.log("Promo consumed and deleted.");
+    }
+
     setClientNote("");
-    setIsPromoValid(false); // Reset promo after buy
+    setIsPromoValid(false); 
     setPromoInput("");
-    sendEmail(ADMIN_EMAIL, `New Node Request`, `User: ${user.email}\nPrice: ₱${currentPrice}`);
-  } else { alert(`Insufficient balance. You need ₱${currentPrice}.`); }
+    sendEmail(ADMIN_EMAIL, `New Node Request`, `User: ${user.email}\nPrice: ₱${currentPrice}\nPromo: ${isPromoValid ? promoInput : 'None'}`);
+    alert("Request Sent!");
+  } else { 
+    alert(`Insufficient balance. You need ₱${currentPrice}.`); 
+  }
 };
 
   const createTrialRequest = async () => {
