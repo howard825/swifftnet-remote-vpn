@@ -176,56 +176,65 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- DATA LISTENERS ---
-  // --- DATA LISTENERS (Fixed for Client Visibility) ---
-  useEffect(() => {
-    if (!user || !db) return;
-    const base = ['artifacts', appId, 'public', 'data'];
-    
-    // 1. PAYMENTS listener
-    const pCol = collection(db, ...base, 'payments');
-    const pQuery = user.role === 'admin' ? pCol : query(pCol, where('email', '==', user.email));
-    onSnapshot(pQuery, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    // 2. REQUESTS listener (Dito ang bara kanina)
-    const rCol = collection(db, ...base, 'requests');
-    const rQuery = user.role === 'admin' ? rCol : query(rCol, where('email', '==', user.email));
-    onSnapshot(rQuery, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    // 3. ASSIGNMENTS listener (Dapat 'clientEmail' ang gamit dito)
-    const aCol = collection(db, ...base, 'assignments');
-    const aQuery = user.role === 'admin' ? aCol : query(aCol, where('clientEmail', '==', user.email));
-    onSnapshot(aQuery, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    // 4. TICKETS listener
-    const tCol = collection(db, ...base, 'tickets');
-    const tQuery = user.role === 'admin' ? query(tCol, orderBy('lastUpdate', 'desc')) : query(tCol, where('clientEmail', '==', user.email), orderBy('lastUpdate', 'desc'));
-    onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-  }, [user]);
-
-  // Sa loob ng iyong main data listener useEffect:
+// --- CONSOLIDATED MASTER LISTENER ---
 useEffect(() => {
   if (!user || !db) return;
+
   const base = ['artifacts', appId, 'public', 'data'];
   
+  // 1. PAYMENTS (Ordered by Date)
+  const pCol = collection(db, ...base, 'payments');
+  const pQuery = user.role === 'admin' 
+    ? query(pCol, orderBy('date', 'desc')) 
+    : query(pCol, where('email', '==', user.email), orderBy('date', 'desc'));
+
+  // 2. REQUESTS (Ordered by Date - Eto ang fix sa Renewal)
+  const rCol = collection(db, ...base, 'requests');
+  const rQuery = user.role === 'admin' 
+    ? query(rCol, orderBy('date', 'desc')) 
+    : query(rCol, where('email', '==', user.email), orderBy('date', 'desc'));
+
+  // 3. ASSIGNMENTS
+  const aCol = collection(db, ...base, 'assignments');
+  const aQuery = user.role === 'admin' 
+    ? aCol 
+    : query(aCol, where('clientEmail', '==', user.email));
+
+  // 4. TICKETS (Ordered by Last Update)
   const tCol = collection(db, ...base, 'tickets');
   const tQuery = user.role === 'admin' 
     ? query(tCol, orderBy('lastUpdate', 'desc')) 
     : query(tCol, where('clientEmail', '==', user.email), orderBy('lastUpdate', 'desc'));
 
-  const unsubscribe = onSnapshot(tQuery, (s) => {
+  // EXECUTE SNAPSHOTS
+  const unp = onSnapshot(pQuery, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+  
+  const unr = onSnapshot(rQuery, (s) => {
+    const fetchedReqs = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    setRequests(fetchedReqs);
+  });
+
+  const una = onSnapshot(aQuery, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+  const unt = onSnapshot(tQuery, (s) => {
     const fetchedTickets = s.docs.map(d => ({ id: d.id, ...d.data() }));
     setTickets(fetchedTickets);
-
-    // FIX: I-update ang activeTicket state para laging fresh ang status at data
+    
+    // Auto-update active ticket state if open
     if (activeTicket) {
       const updatedActive = fetchedTickets.find(t => t.id === activeTicket.id);
       if (updatedActive) setActiveTicket(updatedActive);
     }
   });
 
-  return () => unsubscribe();
-}, [user, activeTicket?.id]); // Idagdag ang activeTicket.id sa dependencies
+  // CLEANUP: Patayin ang listeners kapag nag-unmount ang app o nag-logout
+  return () => {
+    unp();
+    unr();
+    una();
+    unt();
+  };
+}, [user, activeTicket?.id]); // Mahalaga ang dependencies na ito
 
   // 5. PROMOS listener (I-paste ito sa ilalim ng Tickets listener)
   const promoCol = collection(db, ...base, 'promos');
@@ -358,10 +367,14 @@ const deletePromoCode = async (id) => {
   const handleLogout = () => signOut(auth);
 
   const submitDeposit = async (amount, refNo) => {
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'payments'), {
-      email: user.email, amount, refNo, status: 'pending', date: new Date().toLocaleDateString()
-    });
-  };
+  await addDoc(collection(db, ...base, 'payments'), {
+    email: user.email, 
+    amount, 
+    refNo, 
+    status: 'pending', 
+    date: serverTimestamp() // Palitan ito
+  });
+};
 
   const updatePaymentStatus = async (id, status, clientEmail) => {
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'payments', id), { status });
@@ -410,7 +423,7 @@ const deletePromoCode = async (id) => {
         vpnId: vpnId,
         service: existingAsgn.service || 'winbox',
         note: "Auto-Renewed (Paid)",
-        date: new Date().toLocaleDateString()
+        date: serverTimestamp() // Palitan ito
       });
 
       // 4. Notificationssh
@@ -446,7 +459,7 @@ const deletePromoCode = async (id) => {
       pricePaid: currentPrice,
       promoUsed: isPromoValid ? promoInput.toUpperCase() : "NONE",
       note: clientNote || (serviceCategory === 'internet' ? "Internet VPN Subscription" : "Remote Access"), 
-      date: new Date().toLocaleDateString()
+      date: serverTimestamp() // Palitan ito
     });
 
     if (isPromoValid && promoDoc) {
@@ -482,7 +495,7 @@ const deletePromoCode = async (id) => {
         service: requestService, 
         protocol: vpnProtocol,  
         note: "Free Trial Request",
-        date: new Date().toLocaleDateString()
+        date: serverTimestamp()
       });
       
       // 3. Magbigay ng confirmation alert
@@ -815,25 +828,26 @@ if (view === 'dashboard' && user) {
             {(() => {
               const seenNodes = new Set();
               const uniqueRequests = [];
-              const sortedReqs = [...myReqs]
-                .filter(r => ['new', 'trial', 'renewal'].includes(r.type))
-                .sort((a, b) => new Date(b.date) - new Date(a.date));
+              // Dahil may orderBy na tayo sa listener, HINDI mo na kailangan ng .sort() dito.
+              // Automatic na yung pinaka-latest (renewal) ang unang makikita ng loop.
+              const filteredReqs = myReqs.filter(r => ['new', 'trial', 'renewal'].includes(r.type));
 
-              sortedReqs.forEach(req => {
+              filteredReqs.forEach(req => {
                 const nodeKey = req.vpnId || req.id;
                 if (!seenNodes.has(nodeKey)) {
-                  uniqueRequests.push(req);
+                  uniqueRequests.push(req); // Ang unang papasok dito ay yung pinaka-bago
                   seenNodes.add(nodeKey);
                 }
               });
 
-              if (uniqueRequests.length === 0) return <div className="bg-slate-900/30 p-12 rounded-[40px] border border-slate-800 border-dashed text-center text-slate-500 font-bold italic uppercase">No active instances yet.</div>;
+              if (uniqueRequests.length === 0) return <div className="...">No active instances yet.</div>;
 
               return uniqueRequests.map((req) => {
+                // FIX: Mas robust na asgn lookup
                 const asgn = assignments.find(a => 
                   a.requestId === req.id || 
                   (req.vpnId && a.requestId === req.vpnId) ||
-                  (a.clientEmail === req.email && a.port === req.port)
+                  (a.port && req.port && a.port === req.port)
                 );
                 const hasPendingRenewal = requests.some(r => r.vpnId === req.id && r.status === 'pending');
                 const protocol = req.protocol || 'l2tp'; 
@@ -890,7 +904,7 @@ if (view === 'dashboard' && user) {
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <>
-                          <div className="grid grid-cols-2 gap-4 mb-8 bg-black/40 p-5 rounded-[28px] border border-slate-800/50 shadow-inner"><div className="flex flex-col gap-1 px-4 border-r border-slate-800"><span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.15em]">Date Availed</span><span className="text-[11px] font-black text-white font-mono">{req.date}</span></div><div className="flex flex-col gap-1 px-4"><span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.15em]">Expiration Date</span><span className={`text-[11px] font-black font-mono ${isExpired ? 'text-red-500 animate-pulse' : 'text-blue-400'}`}>{new Date(asgn.expiry).toLocaleDateString()}</span></div></div>
+                          <div className="grid grid-cols-2 gap-4 mb-8 bg-black/40 p-5 rounded-[28px] border border-slate-800/50 shadow-inner"><div className="flex flex-col gap-1 px-4 border-r border-slate-800"><span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.15em]">Date Availed</span><span className="text-[11px] font-black text-white font-mono">{req.date?.seconds ? new Date(req.date.seconds * 1000).toLocaleDateString() : 'Syncing...'}</span></div><div className="flex flex-col gap-1 px-4"><span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.15em]">Expiration Date</span><span className={`text-[11px] font-black font-mono ${isExpired ? 'text-red-500 animate-pulse' : 'text-blue-400'}`}>{new Date(asgn.expiry).toLocaleDateString()}</span></div></div>
                           <div className="space-y-10">
                             {req.status === 'assigned' && !isExpired && <button onClick={async (e) => { e.preventDefault(); try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id), { status: 'active' }); } catch (err) { alert("Error: " + err.message); } }} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-xs shadow-lg uppercase hover:bg-emerald-500 animate-pulse">✅ FINISHED DEPLOYMENT</button>}
                             {req.status === 'active' && (<div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in zoom-in-95 mt-4"><div className="flex items-center gap-3"><div className="text-emerald-400 animate-pulse shrink-0"><IconShield /></div><div className="flex flex-col sm:flex-row sm:items-center gap-2"><span className="text-[10px] font-black text-emerald-500 uppercase italic whitespace-nowrap">Winbox Ready:</span><code className="bg-black/40 text-white font-mono text-xs px-3 py-1.5 rounded-xl border border-emerald-500/20">remote.swifftnet.site:{asgn.port}</code></div></div><button onClick={() => handleCopy(`remote.swifftnet.site:${asgn.port}`, `winbox-${req.id}`)} className={`w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all border ${copiedId === `winbox-${req.id}` ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30 hover:bg-emerald-600 hover:text-white'}`}>{copiedId === `winbox-${req.id}` ? <IconCheck /> : <IconCopy />}{copiedId === `winbox-${req.id}` ? 'Copied' : 'Copy Address'}</button></div>)}
@@ -998,7 +1012,7 @@ if (view === 'dashboard' && user) {
                   <div key={p.id} className="bg-black/40 p-4 rounded-2xl border border-slate-800 flex justify-between items-center mb-3 group hover:border-slate-700 transition-all">
                     <div>
                       <p className="text-xs font-black text-white">₱{p.amount}</p>
-                      <p className="text-[7px] text-slate-500 font-bold uppercase">Ref: {p.refNo}</p>
+                      <p className="text-[7px] text-slate-500 font-bold uppercase">{p.date?.seconds ? new Date(p.date.seconds * 1000).toLocaleDateString() : 'Pending...'} | Ref: {p.refNo}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-[8px] font-black uppercase ${p.status === 'confirmed' ? 'text-emerald-500' : p.status === 'denied' ? 'text-red-500' : 'text-orange-500'}`}>
