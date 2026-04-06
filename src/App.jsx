@@ -709,11 +709,18 @@ if (view === 'dashboard' && user) {
             <p className="text-4xl md:text-5xl font-black">₱{bal}</p>
           </div>
 
-          {/* PRICE CARD */}
+          {/* DYNAMIC PRICE CARD: FIXED YEAR/MONTH LABEL */}
           <div className="bg-slate-900/50 border border-slate-800 p-8 md:p-10 rounded-[30px] md:rounded-[40px] text-center shadow-xl">
-            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Internet VPN Price</p>
-            <p className="text-3xl md:text-4xl font-black text-emerald-500">₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}</p>
-            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">Per Account / Month</p>
+            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">
+              {serviceCategory === 'remote' ? 'Remote Access Price' : 'Internet VPN Price'}
+            </p>
+            <p className="text-3xl md:text-4xl font-black text-emerald-500">
+              ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}
+            </p>
+            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">
+              {/* Dito yung correction sa Remote (Year) vs Internet (Month) */}
+              {serviceCategory === 'remote' ? 'Per Node / Year' : 'Per Account / Month'}
+            </p>
           </div>
 
           {/* SERVICE SELECTOR: Ginawa nating col-span-2 para mapuno ang row sa laptop */}
