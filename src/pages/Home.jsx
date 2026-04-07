@@ -1,29 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { IconShield, IconTelegram, IconCard, IconGoogle } from '../components/Icons';
+import { IconTelegram, IconGoogle } from '../components/Icons';
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-blue-500/30">
       
-      {/* 1. BRAND IDENTITY & NAVIGATION */}
-      <nav className="flex justify-between items-center px-6 md:px-12 py-8 max-w-7xl mx-auto border-b border-slate-900">
-        <div className="flex items-center gap-3">
-          <div className="text-blue-500 scale-125"><IconShield /></div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-black uppercase italic tracking-tighter leading-none">SwifftNet</span>
-            <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em]">Remote V3</span>
-          </div>
-        </div>
-        <div className="flex gap-4 items-center">
-          <Link to="/login" className="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg shadow-blue-600/20">
-            Client Portal
-          </Link>
-        </div>
-      </nav>
-
-      {/* 2. HERO SECTION - APP FUNCTIONALITY */}
-      <section className="px-6 py-20 md:py-32 max-w-5xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      {/* 1. HERO SECTION - APP FUNCTIONALITY */}
+      {/* Nagdagdag ako ng pt-20 para hindi matakpan ng Sticky Navbar ang title */}
+      <section className="px-6 pt-20 pb-20 md:pt-32 md:pb-32 max-w-5xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
         <h1 className="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">
           Secure <span className="text-blue-600">Remote</span> Access Solution.
         </h1>
@@ -33,13 +18,13 @@ export default function Home() {
           Access your local services anywhere in the world without a public IP.
         </p>
         <div className="flex justify-center gap-4 pt-4">
-           <Link to="/login" className="bg-white text-slate-950 px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest hover:scale-105 transition-all text-sm">
+           <Link to="/login" className="bg-white text-slate-950 px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest hover:scale-105 transition-all text-sm shadow-[0_0_40px_rgba(255,255,255,0.1)]">
             Get Your Port Now
           </Link>
         </div>
       </section>
 
-      {/* 3. TRANSPARENCY & DATA PURPOSE (Critical for Google Verification) */}
+      {/* 2. TRANSPARENCY & DATA PURPOSE */}
       <section className="px-6 py-16 bg-slate-900/30 border-y border-slate-900">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center">
@@ -73,7 +58,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. SERVICE INFORMATION */}
+      {/* 3. SERVICE INFORMATION */}
       <section className="px-6 py-24 max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
         <div className="bg-slate-900/40 p-10 rounded-[40px] border border-slate-800 space-y-4 group hover:bg-slate-900 transition-all">
           <h3 className="text-xl font-black uppercase italic text-blue-500">Winbox Remote</h3>
@@ -89,12 +74,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5. FOOTER & COMPLIANCE LINKS */}
+      {/* 4. FOOTER & COMPLIANCE LINKS */}
       <footer className="py-20 border-t border-slate-900 bg-slate-950 text-center space-y-8">
         <div className="flex flex-wrap justify-center gap-8 md:gap-12">
           <Link to="/" className="text-[10px] font-black uppercase text-white tracking-widest">Home</Link>
           <Link to="/login" className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest transition-colors">Client Portal</Link>
-          {/* MANDATORY PRIVACY LINK */}
           <Link to="/privacy-policy" className="text-[10px] font-black uppercase text-blue-500 hover:underline tracking-widest transition-colors">Privacy Policy</Link>
           <Link to="/terms-of-use" className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest transition-colors">Terms of Service</Link>
         </div>
