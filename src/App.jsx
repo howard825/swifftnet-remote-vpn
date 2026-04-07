@@ -84,8 +84,11 @@ export default function App() {
     const unt = onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unpromo = onSnapshot(collection(db, ...base, 'promos'), (s) => setPromos(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unprice = onSnapshot(sRef, (s) => {
-      if (s.exists()) setPrices(s.data());
-    });
+        if (s.exists()) {
+          console.log("Current Prices from DB:", s.data()); // I-log natin para makita mo sa Console (F12)
+          setPrices(prev => ({ ...prev, ...s.data() })); // Merge natin para safe
+        }
+      });
 
     // Cleanup para hindi mabagal ang app
     return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); };
