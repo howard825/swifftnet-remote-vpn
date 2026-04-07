@@ -10,7 +10,7 @@ import {
 import { auth, googleProvider } from '../config/firebase';
 import { IconShield, IconGoogle } from '../components/Icons';
 
-export default function LandingPage() { // TINANGGAL NA ANG { setView }
+export default function Login() { // TINANGGAL NA ANG { setView }
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
@@ -65,7 +65,9 @@ export default function LandingPage() { // TINANGGAL NA ANG { setView }
           <input type="password" placeholder="Password" required value={passInput} onChange={(e)=>setPassInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none focus:border-blue-500 font-bold" />
           {!isSignUp && (
             <div className="text-right px-2">
-              <button type="button" onClick={handleForgotPassword} className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500">Forgot Password?</button>
+              <Link to="/forgot-password" className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500">
+                Forgot Password?
+                </Link>
             </div>
           )}
           <button className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl transition-all">
