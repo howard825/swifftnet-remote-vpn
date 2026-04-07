@@ -30,9 +30,6 @@ import { 
 /**
  * --- BUSINESS CONFIGURATION ---
  */
-const VPN_PRICE = 200;
-const INTERNET_VPN_PRICE = 300; // Internet VPN (Monthly)
-const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
 const appId = "swifftnet-remote-v3"; 
 const base = ['artifacts', appId, 'public', 'data'];
@@ -95,6 +92,10 @@ export default function App() {
   //PROMO STATES
   const [promos, setPromos] = useState([]);
   const [promoInput, setPromoInput] = useState("");
+  // DAGDAG MO ITO:
+  const [vpnPrice, setVpnPrice] = useState(100);
+  const [internetVpnPrice, setInternetVpnPrice] = useState(300);
+  const [promoPrice, setPromoPrice] = useState(150);
   const [isPromoValid, setIsPromoValid] = useState(false);
 
   const [payments, setPayments] = useState([]);
@@ -227,6 +228,23 @@ useEffect(() => {
     }
   });
 
+    // DAGDAG MO ITO SA LOOB NG useEffect:
+  const settingsRef = doc(db, ...base, 'settings', 'prices');
+  const unpPrice = onSnapshot(settingsRef, (sDoc) => {
+    if (sDoc.exists()) {
+      const data = sDoc.data();
+      setVpnPrice(Number(data.vpnPrice) || 100);
+      setInternetVpnPrice(Number(data.internetVpnPrice) || 300);
+      setPromoPrice(Number(data.promoPrice) || 150);
+    }
+  });
+
+  // SA CLEANUP (return), ISAMA MO SI unpPrice:
+  return () => {
+    unp(); unr(); una(); unt();
+    unpPrice(); // <--- Dagdag mo ito dito
+  };
+
   // CLEANUP: Patayin ang listeners kapag nag-unmount ang app o nag-logout
   return () => {
     unp();
@@ -278,6 +296,28 @@ useEffect(() => {
     return () => clearInterval(interval); 
   }, [assignments, user]);
 
+  // DAGDAG MO ITONG FUNCTION:
+  const updateSystemPrices = async (v, i, p) => {
+    try {
+      const sRef = doc(db, ...base, 'settings', 'prices');
+      await updateDoc(sRef, {
+        vpnPrice: Number(v),
+        internetVpnPrice: Number(i),
+        promoPrice: Number(p)
+      });
+      alert("Prices Updated Globally! 🚀");
+    } catch (err) {
+      // Kung first time at wala pang document sa Firestore
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, ...base, 'settings', 'prices'), {
+        vpnPrice: Number(v),
+        internetVpnPrice: Number(i),
+        promoPrice: Number(p)
+      });
+      alert("System Initialized & Prices Saved!");
+    }
+  };
+
   // --- NEW FEATURES HANDLERS ---
   const handleForgotPassword = async () => {
     if (!emailInput) {
@@ -315,7 +355,7 @@ useEffect(() => {
   
   const spent = requests
     .filter(r => r.email === email && r.type !== 'trial' && r.status !== 'denied')
-    .reduce((sum, r) => sum + (r.pricePaid || VPN_PRICE), 0); // Binabasa nito kung 150 o 200 ang binayad
+    .reduce((sum, r) => sum + (r.pricePaid || vpnPrice), 0); // Binabasa nito kung 150 o 200 ang binayad
     
   return deposits - spent;
 };
@@ -388,7 +428,7 @@ const deletePromoCode = async (id) => {
     // Hanapin muna kung anong category yung nire-renew
     const targetReq = requests.find(r => r.id === vpnId || r.vpnId === vpnId);
     const isInternet = targetReq?.category === 'internet';
-    const priceToCharge = isInternet ? INTERNET_VPN_PRICE : VPN_PRICE;
+    const priceToCharge = isInternet ? INTERNET_vpnPrice : vpnPrice;
     const daysToAdd = isInternet ? 30 : 365; // Monthly vs Yearly
     
     if (balance < priceToCharge) {
@@ -442,7 +482,7 @@ const deletePromoCode = async (id) => {
 
   const createVpnRequest = async (type = 'new', vpnId = null) => {
   // 1. Kailangan i-define ang price at balance SA LOOB ng function na ito
-  const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
+  const currentPrice = isPromoValid ? promoPrice : (serviceCategory === 'remote' ? vpnPrice : internetVpnPrice);
   const balance = getUserBalance(user.email);
   
   if (balance >= currentPrice) {
@@ -728,7 +768,7 @@ const deletePromoCode = async (id) => {
 // --- VIEW: DASHBOARD (FULL WIDTH FIX) ---
 if (view === 'dashboard' && user) {
   const bal = getUserBalance(user.email);
-  const currentPrice = isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE);
+  const currentPrice = isPromoValid ? promoPrice : (serviceCategory === 'remote' ? vpnPrice : internetVpnPrice);
   const canAfford = bal >= currentPrice;
   const myReqs = requests.filter(r => r.email === user.email);
   const myPayments = payments.filter(p => p.email === user.email).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -771,7 +811,7 @@ if (view === 'dashboard' && user) {
               {serviceCategory === 'remote' ? 'Remote Access Price' : 'Internet VPN Price'}
             </p>
             <p className="text-3xl md:text-4xl font-black text-emerald-500">
-              ₱{isPromoValid ? PROMO_PRICE : (serviceCategory === 'remote' ? VPN_PRICE : INTERNET_VPN_PRICE)}
+              ₱{isPromoValid ? promoPrice : (serviceCategory === 'remote' ? vpnPrice : internetVpnPrice)}
             </p>
             <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">
               {/* Dito yung correction sa Remote (Year) vs Internet (Month) */}
@@ -900,7 +940,7 @@ if (view === 'dashboard' && user) {
                       {isExpired ? (
                         <div className="text-center space-y-6">
                           <p className="text-slate-400 font-bold italic">Node has expired. Please renew.</p>
-                          {bal >= VPN_PRICE ? (<button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{VPN_PRICE})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
+                          {bal >= vpnPrice ? (<button onClick={() => processAutoRenewal(req.id)} className="bg-emerald-600 px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Renew (₱{vpnPrice})</button>) : <p className="text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse">Insufficient Balance</p>}
                         </div>
                       ) : (req.status === 'assigned' || req.status === 'active') && asgn && (
                         <>
@@ -1040,7 +1080,7 @@ if (view === 'admin' && user) {
         <header className="flex flex-col lg:flex-row justify-between items-center gap-12 border-b border-slate-900 pb-12">
           <h1 className="text-4xl font-black uppercase italic">Admin <span className="text-blue-500">Terminal</span></h1>
           <div className="flex bg-slate-900 p-2 rounded-[30px] border border-slate-800 shadow-2xl overflow-x-auto">
-            {['payments', 'requests', 'tickets', 'clients', 'promos'].map(tab => (
+            {['payments', 'requests', 'tickets', 'clients', 'promos', 'settings'].map(tab => (
               <button key={tab} onClick={() => setAdminTab(tab)} className={`px-8 py-4 rounded-[24px] text-[10px] font-black uppercase transition-all whitespace-nowrap ${adminTab === tab ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-600'}`}>{tab}</button>
             ))}
             <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard</button>
@@ -1213,6 +1253,39 @@ if (view === 'admin' && user) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {adminTab === 'settings' && (
+          <div className="max-w-md mx-auto bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95 shadow-2xl">
+            <div className="text-center">
+              <h2 className="text-lg font-black uppercase text-blue-500 italic">Core Pricing</h2>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Global System Configuration</p>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              updateSystemPrices(e.target.vpn.value, e.target.internet.value, e.target.promo.value);
+            }} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Remote Access (Yearly)</label>
+                <input name="vpn" type="number" defaultValue={vpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-emerald-500 focus:border-blue-500" />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Internet VPN (Monthly)</label>
+                <input name="internet" type="number" defaultValue={internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Promo Price (Code)</label>
+                <input name="promo" type="number" defaultValue={promoPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-orange-500 focus:border-blue-500" />
+              </div>
+
+              <button className="w-full bg-blue-600 py-6 rounded-[30px] font-black uppercase text-xs shadow-xl hover:bg-blue-500 transition-all">
+                Save Changes
+              </button>
+            </form>
           </div>
         )}
       </div>
