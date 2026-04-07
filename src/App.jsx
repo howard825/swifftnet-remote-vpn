@@ -8,11 +8,14 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { onSnapshot, collection, query, where, orderBy, doc } from 'firebase/firestore';
 
 // --- PAGES IMPORT ---
+import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login'; // Na-rename na natin ito
 import ForgotPassword from './pages/ForgotPassword';
 import AdminPanel from './pages/AdminPanel';
 import ClientDashboard from './pages/ClientDashboard';
+import Profile from './pages/Profile';
+import About from './pages/About';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 
@@ -31,7 +34,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [replyBody, setReplyBody] = useState("");
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => signOut(auth).then(() => window.location.href = "/");
   const sendEmail = (to, sub, msg, id) => emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, { to_email: to, subject: `[${id}] ${sub}`, message: msg }, EJS_PUBLIC_KEY);
 
   // AUTH & DATA LISTENERS
@@ -98,28 +101,31 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* GLOBAL NAVBAR: Lilitaw sa lahat ng page */}
+      <Navbar user={user} handleLogout={handleLogout} />
+      
       <Routes>
-        {/* PUBLIC PAGES (Kahit sino pwedeng pumasok) */}
         <Route path="/" element={<Home />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-use" element={<TermsOfUse />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/profile" element={user ? <Profile {...commonProps} /> : <Navigate to="/login" />} />
+        <Route path="/about" element={<About />} />
 
-        {/* AUTH PAGE (Login/Signup) */}
+        {/* LOGIN: Redirects to dashboard if already logged in */}
         <Route path="/login" element={
           !user ? <Login /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)
         } />
 
-        {/* PROTECTED PAGES (Kailangan naka-login) */}
+        {/* PROTECTED: Redirects to HOME (/) if not logged in */}
         <Route path="/dashboard" element={
-          user ? <ClientDashboard {...commonProps} openSupport={() => window.intergram?.open()} /> : <Navigate to="/login" />
+          user ? <ClientDashboard {...commonProps} openSupport={() => window.intergram?.open()} /> : <Navigate to="/" />
         } />
 
         <Route path="/admin" element={
-          user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/login" />
+          user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/" />
         } />
 
-        {/* 404 REDIRECT (Security Catch-all) */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // Imports para sa UI Icons (Inaakalang nasa src/components/Icons.jsx)
@@ -32,7 +33,7 @@ export default function ClientDashboard({
   setReplyBody, 
   handleReply 
 }) {
-
+    const navigate = useNavigate();
   // --- INTERNAL UI STATES ---
   const [serviceCategory, setServiceCategory] = useState("remote"); // remote or internet
   const [requestService, setRequestService] = useState("winbox");
@@ -182,7 +183,7 @@ export default function ClientDashboard({
           </div>
           <div className="flex gap-4 w-full md:w-auto">
             <button onClick={openSupport} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase"><IconTelegram /> Support</button>
-            {user.role === 'admin' && <button onClick={() => setView('admin')} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase">Admin Panel</button>}
+            {user.role === 'admin' && <button onClick={() => navigate('/admin')} className="text-[10px] font-black uppercase text-blue-500 hover:text-blue-400 transition-all">Admin Terminal</button>}
             <button onClick={handleLogout} className="flex-1 md:flex-none bg-slate-800 hover:bg-red-600 px-6 py-3 rounded-2xl transition-all text-[10px] font-black uppercase">Sign Out</button>
           </div>
         </header>

@@ -91,6 +91,13 @@ export default function Login() { // TINANGGAL NA ANG { setView }
           Terms of Use
         </Link>
       </footer>
+
+      <div className="pt-6 border-t border-slate-800 mt-6 text-center">
+        <Link to="/" className="text-[10px] font-black uppercase text-slate-500 hover:text-white transition-all tracking-[0.2em]">
+          ← Return to Homepage
+        </Link>
+      </div>
     </div>
   );
+
 }
