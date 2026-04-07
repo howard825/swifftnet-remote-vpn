@@ -21,7 +21,7 @@ import {
 import AdminPanel from './pages/AdminPanel';
 import ClientDashboard from './pages/ClientDashboard';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfUse from './components/TermsOfUse';
+import TermsOfUse from './pages/TermsOfUse';
 
 export default function App() {
   // --- GLOBAL STATES ---
