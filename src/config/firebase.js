@@ -42,6 +42,6 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 //email JS Config
-const EJS_SERVICE_ID = "service_7s9tg36"; 
-const EJS_TEMPLATE_ID = "template_9pjx12n"; 
-const EJS_PUBLIC_KEY = "gULI8936r5B6AVPx1"; 
+export const EJS_SERVICE_ID = "service_7s9tg36"; 
+export const EJS_TEMPLATE_ID = "template_9pjx12n"; 
+export const EJS_PUBLIC_KEY = "gULI8936r5B6AVPx1"; 
