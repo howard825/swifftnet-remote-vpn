@@ -1,6 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
-export default function PrivacyPolicy({ setView }) {
+export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
       <div className="max-w-4xl w-full bg-slate-900/50 p-8 md:p-12 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
@@ -11,12 +12,13 @@ export default function PrivacyPolicy({ setView }) {
             <h1 className="text-3xl font-black uppercase italic text-blue-500 leading-none">Privacy Policy</h1>
             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">Last Updated: March 31, 2026</p>
           </div>
-          <button 
-            onClick={() => setView('landing')} 
+          {/* BINAGO: Ginawang Link para gumana ang URL change */}
+          <Link 
+            to="/" 
             className="bg-slate-800 hover:bg-blue-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all border border-slate-700"
           >
             Back
-          </button>
+          </Link>
         </header>
 
         {/* CONTENT AREA */}
@@ -26,7 +28,6 @@ export default function PrivacyPolicy({ setView }) {
             This Privacy Policy outlines how <strong>SwifftNET</strong> (vpn.swifftnet.site) collects, uses, and protects your data when you use our Remote Access and VPN services. As a Philippine-based provider, we are committed to upholding the <strong>Data Privacy Act of 2012 (RA 10173)</strong> and ensuring your network activity remains secure and private.
           </p>
 
-          {/* SECTION 1 */}
           <section className="space-y-4">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">1. Information We Collect</h2>
             <p>To provide reliable remote access, we collect two categories of information:</p>
@@ -56,7 +57,6 @@ export default function PrivacyPolicy({ setView }) {
             </p>
           </section>
 
-          {/* SECTION 2 */}
           <section className="space-y-3">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">2. Purpose of Data Processing</h2>
             <p>We use your data strictly for the following purposes:</p>
@@ -68,7 +68,6 @@ export default function PrivacyPolicy({ setView }) {
             </ul>
           </section>
 
-          {/* SECTION 3 */}
           <section className="space-y-3">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">3. Data Retention & Security</h2>
             <ul className="list-disc ml-5 space-y-2">
@@ -78,7 +77,6 @@ export default function PrivacyPolicy({ setView }) {
             </ul>
           </section>
 
-          {/* SECTION 4 */}
           <section className="space-y-3">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">4. Your Rights as a Data Subject</h2>
             <p>Under the Data Privacy Act of 2012, you have the right to:</p>
@@ -90,7 +88,6 @@ export default function PrivacyPolicy({ setView }) {
             </ul>
           </section>
 
-          {/* SECTION 5 */}
           <section className="space-y-3">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">5. Third-Party Sharing</h2>
             <p>We <strong>never sell</strong> your personal data. Sharing only occurs with:</p>
@@ -100,7 +97,6 @@ export default function PrivacyPolicy({ setView }) {
             </ul>
           </section>
 
-          {/* SECTION 6 */}
           <section className="space-y-4 pt-6 border-t border-slate-800">
             <h2 className="text-blue-500 font-black uppercase tracking-tight italic text-lg">6. Contact Us</h2>
             <p>If you have questions about this policy or wish to exercise your privacy rights, please contact our Data Protection Officer:</p>
@@ -115,12 +111,12 @@ export default function PrivacyPolicy({ setView }) {
 
         {/* FOOTER ACTION */}
         <footer className="pt-4">
-          <button 
-            onClick={() => setView('landing')} 
-            className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
+          <Link 
+            to="/" 
+            className="w-full inline-block text-center bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
           >
-            I Understand - Return to Login
-          </button>
+            Back to Login
+          </Link>
         </footer>
       </div>
     </div>

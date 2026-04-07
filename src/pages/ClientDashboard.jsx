@@ -242,10 +242,36 @@ export default function ClientDashboard({
             )}
 
             {assignments.map((asgn) => {
-              const isExpired = new Date() > new Date(asgn.expiry);
-              const script = asgn.protocol === 'l2tp' 
-                ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=SwifftNet user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
-                : `/interface sstp-client add connect-to=remote.swifftnet.site name=SwifftNet user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
+                const isExpired = new Date() > new Date(asgn.expiry);
+
+                // --- COMPLETE MIKROTIK SCRIPT LOGIC (RESTORING ORIGINAL) ---
+                const script = (() => {
+                    const protocol = asgn.protocol || 'l2tp';
+                    const isInternet = asgn.category === 'internet' || (asgn.service && asgn.service === 'internet'); 
+                    const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
+
+                    // 1. BASE TUNNEL SCRIPT
+                    let baseScript = protocol === 'l2tp' 
+                    ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
+                    : `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
+
+                    if (isInternet) {
+                    // 2. INTERNET VPN ADD-ONS (Monthly Service)
+                    return `${baseScript}
+                /ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping
+                /ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade comment="SwifftNet VPN Internet"`;
+                    } else {
+                    // 3. REMOTE ACCESS ADD-ONS (Yearly Service + Security)
+                    return `${baseScript}
+                /ip firewall filter add action=accept chain=input comment="SwifftNet Remote" src-address=192.168.88.0/21
+                /ip firewall filter add action=accept chain=input comment="Allow SwifftNet Top" place-before=0 src-address=192.168.88.0/21
+                /ip firewall filter add action=accept chain=forward comment="Allow SwifftNet Fwd" place-before=0 src-address=192.168.88.0/21
+                /ip service
+                set winbox address=192.168.88.0/21
+                set api address=192.168.88.0/21
+                set ssh address=192.168.88.0/21`;
+                    }
+                })();
 
               return (
                 <div key={asgn.id} className={`bg-slate-900 rounded-[50px] border shadow-2xl mb-8 animate-in slide-in-from-left-4 ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800'}`}>

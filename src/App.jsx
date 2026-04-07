@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // DAGDAG ITO
 import emailjs from '@emailjs/browser';
 import LandingPage from './pages/LandingPage';
 
@@ -149,35 +150,35 @@ export default function App() {
     activeTicket, setActiveTicket, messages, replyBody, setReplyBody
   };
 
-  // I-render ang tamang view base sa 'view' state
-  switch (view) {
-    case 'admin':
-      return <AdminPanel {...commonProps} />;
-    
-    case 'dashboard':
-      return <ClientDashboard {...commonProps} openSupport={() => window.intergram?.open()} />;
-    
-    case 'landing':
-      // Dito mo i-pa-paste ang Landing UI o ang component nito
-      return <LandingPage setView={setView} />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* 1. HOME / LANDING PAGE */}
+        {/* Kung hindi login (!user), ipakita ang LandingPage. */}
+        {/* Kung login na, i-redirect sa Admin o Dashboard base sa role niya. */}
+        <Route path="/" element={
+          !user ? <LandingPage /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)
+        } />
 
-    case 'privacy': // DAGDAG MO ITO
-      return <PrivacyPolicy setView={setView} />;
+        {/* 2. PRIVACY POLICY - Eto yung request mo na magkaroon ng sariling URL */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-    case 'terms':   // DAGDAG MO ITO
-      return <TermsOfUse setView={setView} />;
-    
-    case 'verify-email':
-      return (
-        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-10 text-center">
-          <h2 className="text-2xl font-black uppercase mb-4 text-orange-500">Verify Your Email</h2>
-          <p className="text-slate-400 mb-8 max-w-md">Check your inbox for the verification link. You must verify your account before accessing the dashboard.</p>
-          <button onClick={() => window.location.reload()} className="bg-blue-600 px-8 py-3 rounded-2xl font-black uppercase mb-4">I have verified</button>
-          <button onClick={handleLogout} className="text-slate-500 underline text-xs">Logout</button>
-        </div>
-      );
+        {/* 3. TERMS OF SERVICE */}
+        <Route path="/terms-of-use" element={<TermsOfUse />} />
 
-    default:
-      return <div className="text-white">Something went wrong.</div>;
-  }
+        {/* 4. CLIENT DASHBOARD (Protected: Kailangan naka-login) */}
+        <Route path="/dashboard" element={
+          user ? <ClientDashboard {...commonProps} openSupport={() => window.intergram?.open()} /> : <Navigate to="/" />
+        } />
+
+        {/* 5. ADMIN PANEL (Protected: Kailangan Admin email mo ang gamit) */}
+        <Route path="/admin" element={
+          user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/" />
+        } />
+
+        {/* 6. CATCH-ALL (Kapag nag-type sila ng maling URL, balik sila sa Home) */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }

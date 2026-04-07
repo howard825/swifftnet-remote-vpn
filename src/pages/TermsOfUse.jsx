@@ -1,6 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom'; // Siguradong imported ito
 
-export default function TermsOfUse({ setView }) {
+export default function TermsOfUse() { // Tinanggal na natin ang { setView } prop
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 flex flex-col items-center animate-in fade-in duration-500">
       <div className="max-w-4xl w-full bg-slate-900/50 p-8 md:p-12 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
@@ -11,12 +12,13 @@ export default function TermsOfUse({ setView }) {
             <h1 className="text-3xl font-black uppercase italic text-emerald-500 leading-none">Terms of Service</h1>
             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">Last Updated: March 31, 2026</p>
           </div>
-          <button 
-            onClick={() => setView('landing')} 
-            className="bg-slate-800 hover:bg-emerald-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all border border-slate-700"
+          {/* BINAGO NATIN ITO: Mula button, ginawa nating Link */}
+          <Link 
+            to="/" 
+            className="bg-slate-800 hover:bg-blue-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all border border-slate-700"
           >
             Back
-          </button>
+          </Link>
         </header>
 
         {/* CONTENT AREA */}
@@ -108,12 +110,12 @@ export default function TermsOfUse({ setView }) {
 
         {/* FOOTER ACTION */}
         <footer className="pt-4">
-          <button 
-            onClick={() => setView('landing')} 
-            className="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+          <Link 
+            to="/" 
+            className="w-full inline-block text-center bg-emerald-600 hover:bg-emerald-500 py-5 rounded-3xl font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)]"
           >
             I Accept These Terms
-          </button>
+          </Link>
         </footer>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   signInWithPopup, 
   createUserWithEmailAndPassword, 
@@ -9,7 +10,7 @@ import {
 import { auth, googleProvider } from '../config/firebase';
 import { IconShield, IconGoogle } from '../components/Icons';
 
-export default function LandingPage({ setView }) {
+export default function LandingPage() { // TINANGGAL NA ANG { setView }
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
@@ -81,8 +82,12 @@ export default function LandingPage({ setView }) {
       </div>
 
       <footer className="mt-12 flex gap-8">
-        <button onClick={() => setView('privacy')} className="text-slate-600 hover:text-blue-500 text-[10px] font-black uppercase tracking-widest">Privacy Policy</button>
-        <button onClick={() => setView('terms')} className="text-slate-600 hover:text-emerald-500 text-[10px] font-black uppercase tracking-widest">Terms of Use</button>
+        <Link to="/privacy-policy" className="text-slate-600 hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors">
+          Privacy Policy
+        </Link>
+        <Link to="/terms-of-use" className="text-slate-600 hover:text-emerald-500 text-[10px] font-black uppercase tracking-widest transition-colors">
+          Terms of Use
+        </Link>
       </footer>
     </div>
   );
