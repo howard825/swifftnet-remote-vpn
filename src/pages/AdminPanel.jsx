@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 // Imports para sa Firebase Firestore functions na kailangan ng Admin
 import { doc, updateDoc, deleteDoc, collection, addDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -30,7 +31,7 @@ export default function AdminPanel({
   replyBody,       // State para sa input field ng reply
   setReplyBody     // Function para i-update ang replyBody state
 }) {
-  
+  const navigate = useNavigate();
   // INTERNAL STATE: Para sa navigation tabs sa loob ng Admin Panel
   const [adminTab, setAdminTab] = useState('payments');
 
@@ -241,7 +242,7 @@ export default function AdminPanel({
               </button>
             ))}
             {/* Button para bumalik sa Client Dashboard view para makita ang generated scripts */}
-            <button onClick={() => setView('dashboard')} className="px-8 py-4 text-emerald-500 text-[10px] font-black uppercase whitespace-nowrap">Dashboard View</button>
+           <button onClick={() => navigate('/dashboard')} className="text-[10px] font-black uppercase text-emerald-500 hover:text-emerald-400 transition-all">DASHBOARD VIEW</button>
           </div>
         </header>
 
