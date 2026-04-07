@@ -428,7 +428,7 @@ const deletePromoCode = async (id) => {
     // Hanapin muna kung anong category yung nire-renew
     const targetReq = requests.find(r => r.id === vpnId || r.vpnId === vpnId);
     const isInternet = targetReq?.category === 'internet';
-    const priceToCharge = isInternet ? INTERNET_vpnPrice : vpnPrice;
+    const priceToCharge = isInternet ? internetVpnPrice : vpnPrice;
     const daysToAdd = isInternet ? 30 : 365; // Monthly vs Yearly
     
     if (balance < priceToCharge) {
