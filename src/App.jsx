@@ -46,9 +46,46 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- 2. CONSOLIDATED MASTER LISTENERS ---
   useEffect(() => {
     if (!user || !db) return;
-    // ... (Yung onSnapshot listeners mo para sa payments, requests, etc. dito)
+
+    // A. PAYMENTS
+    const pQuery = user.role === 'admin' 
+      ? query(collection(db, ...base, 'payments'), orderBy('date', 'desc')) 
+      : query(collection(db, ...base, 'payments'), where('email', '==', user.email), orderBy('date', 'desc'));
+
+    // B. REQUESTS
+    const rQuery = user.role === 'admin' 
+      ? query(collection(db, ...base, 'requests'), orderBy('date', 'desc')) 
+      : query(collection(db, ...base, 'requests'), where('email', '==', user.email), orderBy('date', 'desc'));
+
+    // C. ASSIGNMENTS (Dito nakabase yung Nodes nila)
+    // IMPORTANT: Check mo kung 'clientEmail' o 'email' ang field name mo sa Firestore!
+    const aQuery = user.role === 'admin' 
+      ? collection(db, ...base, 'assignments') 
+      : query(collection(db, ...base, 'assignments'), where('clientEmail', '==', user.email));
+
+    // D. TICKETS
+    const tQuery = user.role === 'admin' 
+      ? query(collection(db, ...base, 'tickets'), orderBy('lastUpdate', 'desc')) 
+      : query(collection(db, ...base, 'tickets'), where('clientEmail', '==', user.email), orderBy('lastUpdate', 'desc'));
+
+    // E. SETTINGS (Prices)
+    const sRef = doc(db, ...base, 'settings', 'prices');
+
+    // EXECUTE LISTENERS (Dapat nandito ang mga ito para mag-update ang UI)
+    const unp = onSnapshot(pQuery, (s) => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unr = onSnapshot(rQuery, (s) => setRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const una = onSnapshot(aQuery, (s) => setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unt = onSnapshot(tQuery, (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unpromo = onSnapshot(collection(db, ...base, 'promos'), (s) => setPromos(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unprice = onSnapshot(sRef, (s) => {
+      if (s.exists()) setPrices(s.data());
+    });
+
+    // Cleanup para hindi mabagal ang app
+    return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); };
   }, [user]);
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono animate-pulse">SWIFFTNET CORE STARTING...</div>;
