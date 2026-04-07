@@ -22,6 +22,7 @@ export default function ClientDashboard({
   handleLogout,   // Logout function
   openSupport,    // Intergram opener
   sendEmail,      // EmailJS function
+  setView,
   
   // Support Modal Props
   activeTicket, 
