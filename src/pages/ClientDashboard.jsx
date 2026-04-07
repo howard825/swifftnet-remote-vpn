@@ -63,7 +63,7 @@ export default function ClientDashboard({
   // --- HANDLERS ---
 
   const validatePromo = () => {
-    const found = promos.find(p => p.code.toUpperCase() === promoInput.toUpperCase());
+    const found = promos.find(p => (p.code || '').toUpperCase() === (promoInput || '').toUpperCase());
     if (found) {
       setIsPromoValid(true);
       alert(`Promo Applied! New price: ₱${prices.promoPrice}`);
@@ -252,7 +252,7 @@ export default function ClientDashboard({
                   <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800 rounded-t-[50px]">
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${asgn.isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
-                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">Port: {asgn.port} | {asgn.service.toUpperCase()}</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">Port: {asgn.port} | {(asgn.service || 'winbox').toUpperCase()}</span>
                     </div>
                     <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                       {isExpired ? 'EXPIRED' : asgn.isOnline ? 'CONNECTED' : 'STANDBY'}
@@ -309,7 +309,7 @@ export default function ClientDashboard({
                   <div key={t.id} onClick={()=>setActiveTicket(t)} className={`bg-slate-950 p-4 rounded-2xl border border-slate-800 cursor-pointer hover:border-blue-500 transition-all ${t.status === 'answered' ? 'border-emerald-500' : ''}`}>
                     <p className="text-[10px] font-black uppercase mb-1 truncate">{t.subject}</p>
                     <div className="flex justify-between text-[7px] font-black">
-                      <span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
+                      <span className={t.status === 'open' ? 'text-orange-500' : 'text-emerald-500'}>{(t.status || 'open').toUpperCase()}</span>
                       <span className="text-slate-600">{new Date(t.lastUpdate).toLocaleDateString()}</span>
                     </div>
                   </div>

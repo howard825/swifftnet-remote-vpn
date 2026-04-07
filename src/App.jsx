@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
+import LandingPage from './pages/LandingPage';
 
 // --- FIREBASE & CONFIG IMPORTS ---
 import { auth, db, base, ADMIN_EMAIL, EJS_SERVICE_ID, EJS_TEMPLATE_ID, EJS_PUBLIC_KEY } from './config/firebase';
@@ -19,8 +20,8 @@ import {
 // --- PAGES & COMPONENTS IMPORTS ---
 import AdminPanel from './pages/AdminPanel';
 import ClientDashboard from './pages/ClientDashboard';
-// Import mo rito ang LandingPage, PrivacyPolicy, at Terms kapag na-split mo na rin sila
-// import LandingPage from './pages/LandingPage'; 
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfUse from './components/TermsOfUse';
 
 export default function App() {
   // --- GLOBAL STATES ---
@@ -158,10 +159,23 @@ export default function App() {
     
     case 'landing':
       // Dito mo i-pa-paste ang Landing UI o ang component nito
-      return <div className="text-white text-center p-20">Landing Page Placeholder (Please Move Landing Code Here)</div>;
+      return <LandingPage setView={setView} />;
+
+    case 'privacy': // DAGDAG MO ITO
+      return <PrivacyPolicy setView={setView} />;
+
+    case 'terms':   // DAGDAG MO ITO
+      return <TermsOfUse setView={setView} />;
     
     case 'verify-email':
-      return <div className="text-white text-center p-20 font-black uppercase">Please Verify Your Email.</div>;
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-10 text-center">
+          <h2 className="text-2xl font-black uppercase mb-4 text-orange-500">Verify Your Email</h2>
+          <p className="text-slate-400 mb-8 max-w-md">Check your inbox for the verification link. You must verify your account before accessing the dashboard.</p>
+          <button onClick={() => window.location.reload()} className="bg-blue-600 px-8 py-3 rounded-2xl font-black uppercase mb-4">I have verified</button>
+          <button onClick={handleLogout} className="text-slate-500 underline text-xs">Logout</button>
+        </div>
+      );
 
     default:
       return <div className="text-white">Something went wrong.</div>;

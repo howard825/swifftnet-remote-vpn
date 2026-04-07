@@ -281,7 +281,7 @@ export default function AdminPanel({
                 
                 {/* Badge para sa Request Type */}
                 <span className={`absolute top-8 right-8 px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${r.type === 'trial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' : r.type === 'renewal' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-blue-500/10 text-blue-500 border-blue-500/30'}`}>
-                  {r.type.toUpperCase()} REQUEST
+                  {(r.type || 'new').toUpperCase()} REQUEST
                 </span>
 
                 <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6 pr-20">{r.email}</p>
@@ -342,7 +342,7 @@ export default function AdminPanel({
                 <div className="flex justify-between items-center text-[9px] font-black text-slate-500">
                   {/* Ipakita lang ang oras kung ngayong araw */}
                   <span>LAST: {new Date(t.lastUpdate).toLocaleTimeString()}</span>
-                  <span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{t.status.toUpperCase()}</span>
+                  <span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{(t.status || 'open').toUpperCase()}</span>
                 </div>
                 <button className="bg-blue-600 w-full py-3 rounded-2xl text-[10px] font-black uppercase mt-6 group-hover:bg-blue-500 transition-colors">Open Conversation</button>
               </div>
@@ -356,7 +356,7 @@ export default function AdminPanel({
                   {/* Modal Header */}
                   <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {activeTicket.id.slice(-6).toUpperCase()}</p>
+                      <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Support Case: {(activeTicket.id?.slice(-6) || 'N/A').toUpperCase()}</p>
                       <h2 className="font-black uppercase tracking-tight text-lg italic">{activeTicket.subject}</h2>
                       <p className="text-[9px] text-slate-500 font-bold">{activeTicket.clientEmail}</p>
                     </div>
