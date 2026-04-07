@@ -30,7 +30,7 @@ import { 
 /**
  * --- BUSINESS CONFIGURATION ---
  */
-const VPN_PRICE = 100;
+const VPN_PRICE = 200;
 const INTERNET_VPN_PRICE = 300; // Internet VPN (Monthly)
 const PROMO_PRICE = 150;
 const ADMIN_EMAIL = "ramoshowardkingsley58@gmail.com"; 
