@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'; // Added doc, getDoc
+import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore'; // Added doc, getDoc
 import { db } from '../config/firebase';
 import { IconSearch, IconCheck, IconShield } from '../components/Icons';
 
