@@ -243,6 +243,36 @@ export default function ClientDashboard({
               <button onClick={()=>handleVpnRequest()} disabled={!canAfford} className={`py-4 rounded-xl font-black text-[10px] uppercase transition-all ${canAfford ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}>
                 {canAfford ? 'Buy Now' : 'Refill Balance'}
               </button>
+              {/* --- BILLING SYSTEM ACCESS CARD --- */}
+              <div className="bg-slate-900/50 p-8 rounded-[45px] border border-slate-800 flex flex-col justify-between group hover:border-emerald-500/30 transition-all shadow-2xl relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-6">
+                      <div className="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-500">
+                          <IconCard className="w-8 h-8" />
+                      </div>
+                      <div className="bg-emerald-600/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
+                          <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">New Feature</p>
+                      </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                      <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">WISP Billing System</h3>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-relaxed">
+                          Manage your own customers, track collections, and generate professional receipts.
+                      </p>
+                  </div>
+
+                  <button 
+                      onClick={() => navigate('/billing')} 
+                      className="mt-8 w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-emerald-600/20 transition-all"
+                  >
+                      {user.billingAccessUntil && user.billingAccessUntil.toDate() > new Date() 
+                          ? "Open My Billing" 
+                          : "Avail License (₱" + (prices.billing_system_license || 150) + ")"}
+                  </button>
+
+                  {/* Background Glow Effect */}
+                  <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-600/5 rounded-full blur-3xl group-hover:bg-emerald-600/10 transition-all"></div>
+              </div>
             </div>
           </div>
         </div>
