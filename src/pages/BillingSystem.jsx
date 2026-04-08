@@ -65,10 +65,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
         setLoading(true);
         try {
             const userRef = doc(db, 'users', user.uid); 
-            await updateDoc(userRef, { 
-                billingAccessUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 
-                credits: bal - dynamicPrice 
-            });
+            await setDoc(userRef, { 
+                billingAccessUntil: expiryDate,
+                credits: Number(bal) - Number(dynamicPrice) 
+            }, { merge: true });
             await addDoc(collection(db, 'artifacts', appId || 'swifftnet-remote-v3', 'public', 'data', 'payments'), {
                 email: user.email, amount: -dynamicPrice, status: 'confirmed', type: 'billing_license', refNo: `BILL-${Math.random().toString(36).toUpperCase().slice(2,8)}`, date: serverTimestamp()
             });
