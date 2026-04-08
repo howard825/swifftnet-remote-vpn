@@ -315,7 +315,7 @@ export default function ClientDashboard({
                       return `${baseScript}\n/ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping\n/ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade`;
                     } else {
                       // Original Remote Script + Silent Monitor Port logic
-                      return `${baseScript}\n/ip firewall filter add action=accept chain=input src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
+                      return `${baseScript}\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
                     }
                 })();
 
