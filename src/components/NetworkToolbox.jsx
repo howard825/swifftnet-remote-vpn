@@ -21,7 +21,7 @@ export default function NetworkToolbox() {
     const start = Date.now();
     try {
       // Mag-fe-fetch tayo sa server mo para makuha ang actual RTT
-      await fetch('https://remote.swifftnet.site', { mode: 'no-cors', cache: 'no-cache' });
+      await fetch('remote.swifftnet.site', { mode: 'no-cors', cache: 'no-cache' });
       const end = Date.now();
       setLatency(`${end - start}ms`);
     } catch (err) {
