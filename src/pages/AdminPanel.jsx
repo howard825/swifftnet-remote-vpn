@@ -105,7 +105,8 @@ export default function AdminPanel({
             user: data.u,
             pass: data.p,
             port: data.port,
-            portAux: data.portAux
+            portAux: data.portAux,
+            webPort: data.webPort // <--- IDINAGDAG PARA SA STATUS CHECK
           });
         }
       } else {
@@ -118,6 +119,7 @@ export default function AdminPanel({
           pass: data.p, 
           port: data.port, 
           portAux: data.portAux, 
+          webPort: data.webPort, // <--- IDINAGDAG PARA SA STATUS CHECK
           service: data.service, 
           expiry: finalExpiry.toISOString(),
           expiryNotified: false,
@@ -134,7 +136,7 @@ export default function AdminPanel({
         type === 'renewal' ? "SwifftNet: VPN Renewed! ⏳" : "SwifftNet: VPN PORT Assigned! 🚀", 
         type === 'renewal' 
           ? `Your VPN CREDENTIALS has been extended. New expiry: ${finalExpiry.toLocaleDateString()}`
-          : `Your VPN credentials are ready as well as Your ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
+          : `Your VPN credentials and ports are ready. Winbox: ${data.port}, SSH/API: ${data.portAux}`
       );
       
       alert(type === 'renewal' ? "Assignment Updated (Renewed)" : "New Assignment Created");
@@ -250,7 +252,7 @@ export default function AdminPanel({
               </button>
             ))}
             {/* Button para bumalik sa Client Dashboard view para makita ang generated scripts */}
-           <button onClick={() => navigate('/dashboard')} className="text-[10px] font-black uppercase text-emerald-500 hover:text-emerald-400 transition-all">DASHBOARD VIEW</button>
+           <button onClick={() => navigate('/dashboard')} className="text-[10px] font-black uppercase text-emerald-500 hover:text-emerald-400 transition-all px-6">DASHBOARD VIEW</button>
           </div>
         </header>
 
@@ -303,8 +305,9 @@ export default function AdminPanel({
                     days: fd.get('d'), // Inputted days
                     u: fd.get('u'),    // VPN User
                     p: fd.get('p'),    // VPN Pass
-                    port: fd.get('port'), // Port 1
-                    portAux: fd.get('portAux'), // Port 2
+                    port: fd.get('port'), // Port 1 (Winbox)
+                    portAux: fd.get('portAux'), // Port 2 (SSH/API)
+                    webPort: fd.get('webPort'), // <--- IDINAGDAG (Silent Monitor Port)
                     service: r.service || 'winbox' // Default service
                   }, r.type, r.vpnId, r.category); // Pass important request metadata
                 }} className="space-y-6">
@@ -321,10 +324,20 @@ export default function AdminPanel({
                     <input name="p" placeholder="Generate VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
                   </div>
                   
-                  {/* Port Assignments */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <input name="port" placeholder="Assigned Port 1 (Winbox)" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
-                    <input name="portAux" placeholder="Assigned Port 2 (SSH/API)" className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
+                  {/* Port Assignments (Triple Input Grid) */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[7px] text-slate-700 font-black uppercase text-center">Winbox</p>
+                      <input name="port" placeholder="Port 1" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[7px] text-slate-700 font-black uppercase text-center">SSH/API</p>
+                      <input name="portAux" placeholder="Port 2" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[7px] text-orange-600 font-black uppercase text-center">Silent Port</p>
+                      <input name="webPort" placeholder="Web" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-orange-500 outline-none border border-slate-800 focus:border-orange-500" />
+                    </div>
                   </div>
 
                   {/* Submit Button */}
@@ -349,7 +362,6 @@ export default function AdminPanel({
                 <p className="text-[10px] font-black text-blue-500 mb-2 truncate uppercase tracking-widest">{t.clientEmail}</p>
                 <p className="text-sm font-black uppercase mb-4 truncate italic">{t.subject}</p>
                 <div className="flex justify-between items-center text-[9px] font-black text-slate-500">
-                  {/* Ipakita lang ang oras kung ngayong araw */}
                   <span>LAST: {new Date(t.lastUpdate).toLocaleTimeString()}</span>
                   <span className={t.status === 'open' ? 'text-red-500 animate-pulse' : 'text-emerald-500'}>{(t.status || 'open').toUpperCase()}</span>
                 </div>
@@ -440,7 +452,7 @@ export default function AdminPanel({
                 <tr>
                   <th className="p-10">Client Profile</th>
                   <th className="p-10 text-center">Net Balance</th>
-                  <th className="p-10">Network Nodes</th>
+                  <th className="p-10">Node Matrix (W | S | H)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
@@ -463,7 +475,7 @@ export default function AdminPanel({
                         <p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Credits</p>
                       </div>
                     </td>
-                    {/* Column 3: Active Nodes (Assignments) */}
+                    {/* Column 3: Active Nodes (Assignments) - Merged SSH & Added H */}
                     <td className="p-10 align-top">
                       <div className="space-y-4">
                         {assignments.filter(a => a.clientEmail === email).length > 0 ? (
@@ -473,9 +485,10 @@ export default function AdminPanel({
                                 <div className="flex flex-col gap-1 pr-4 border-r border-slate-800">
                                   <span className="text-blue-400 font-mono text-[11px] font-black uppercase leading-none">W: <span className="text-white">{t.port}</span></span>
                                   <span className="text-blue-600 font-mono text-[11px] font-black uppercase mt-1">S: <span className="text-white">{t.portAux || 'N/A'}</span></span>
+                                  <span className="text-orange-500 font-mono text-[10px] font-black uppercase mt-1">H: <span className="text-white">{t.webPort || 'NONE'}</span></span>
                                 </div>
                                 <div className="flex items-center gap-2 pl-2">
-                                  <span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>{t.isOnline ? 'Online' : 'Offline'}</span>
+                                  <span className={`text-[9px] font-black uppercase ${t.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>{t.isOnline ? 'Active' : 'Offline'}</span>
                                   <div className={`w-2 h-2 rounded-full ${t.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-700'}`} />
                                 </div>
                               </div>
@@ -501,7 +514,7 @@ export default function AdminPanel({
           </div>
         )}
 
-        {/* --- TAB CONTENT: SETTINGS (Pricing) --- */}
+        {/* --- TAB CONTENT: SETTINGS (Pricing & Global Config) --- */}
         {adminTab === 'settings' && (
           <div className="max-w-md mx-auto space-y-8 animate-in zoom-in-95 shadow-2xl">
             {/* PRICING CARD */}
@@ -518,7 +531,7 @@ export default function AdminPanel({
                   e.target.vpn.value, 
                   e.target.internet.value, 
                   e.target.promo.value,
-                  e.target.billing.value // <--- IDINAGDAG
+                  e.target.billing.value // <--- IDINAGDAG PARA SA BILLING LICENSE
                 );
               }} className="space-y-6">
                 <div className="space-y-2">
@@ -529,9 +542,8 @@ export default function AdminPanel({
                   <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Internet VPN (Monthly Price)</label>
                   <input name="internet" type="number" defaultValue={prices?.internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500 transition-all" />
                 </div>
-                {/* --- IDINAGDAG: BILLING LICENSE PRICE --- */}
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Billing System License (Monthly)</label>
+                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Billing License (Monthly)</label>
                   <input name="billing" type="number" defaultValue={prices?.billing_system_license || 150} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-400 focus:border-blue-400 transition-all" />
                 </div>
                 <div className="space-y-2">
@@ -564,7 +576,7 @@ export default function AdminPanel({
               </div>
             </div>
 
-            {/* MAINTENANCE CARD */}
+            {/* MAINTENANCE CARD (System Lockdown) */}
             <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl mt-8 border-t-4 border-t-orange-600">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3 text-orange-500">
