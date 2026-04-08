@@ -13,17 +13,17 @@ export default function AdminPanel({
   user,           // Ang kasalukuyang logged-in admin object
   payments,       // Listahan ng lahat ng payments mula sa master listener
   requests,       // Listahan ng lahat ng requests mula sa master listener
-  tickets,        // Listahan ng lahat ng support tickets
+  tickets,         // Listahan ng lahat ng support tickets
   assignments,    // Listahan ng lahat ng VPN assignments/nodes
-  promos,         // Listahan ng lahat ng active promo codes
-  prices,         // Object na naglalaman ng vpnPrice, internetVpnPrice, promoPrice
+  promos,          // Listahan ng lahat ng active promo codes
+  prices,          // Object na naglalaman ng vpnPrice, internetVpnPrice, promoPrice
   maint,           // <--- IDINAGDAG
   setMaint,        // <--- IDINAGDAG
   announcement,    // (Siguraduhin na nandito rin ito base sa code mo)
   setAnnouncement, // (Siguraduhin na nandito rin ito base sa code mo)
-  db,             // Firebase Firestore database instance mula sa config
-  appId,          // SwifftNet App ID constant
-  base,           // Firestore base path array constant
+  db,              // Firebase Firestore database instance mula sa config
+  appId,           // SwifftNet App ID constant
+  base,            // Firestore base path array constant
   ADMIN_EMAIL,    // Ang email address mo (Ramos Howard Kingsley)
   setView,        // Function para maglipat ng view (e.g., pabalik sa dashboard)
   sendEmail,      // Function para mag-send ng email notifications (EmailJS)
@@ -176,14 +176,15 @@ export default function AdminPanel({
     }
   };
 
-  // 4. Pagbago ng Global Pricing Settings
-  const updateSystemPrices = async (v, i, p) => {
+  // 4. Pagbago ng Global Pricing Settings (Dinagdagan ng b para sa Billing License)
+  const updateSystemPrices = async (v, i, p, b) => {
     try {
       const sRef = doc(db, ...base, 'settings', 'prices');
       await updateDoc(sRef, {
         vpnPrice: Number(v),
         internetVpnPrice: Number(i),
-        promoPrice: Number(p)
+        promoPrice: Number(p),
+        billing_system_license: Number(b) // <--- IDINAGDAG
       });
       alert("Prices Updated Globally! 🚀");
     } catch (err) {
@@ -191,7 +192,8 @@ export default function AdminPanel({
       await setDoc(doc(db, ...base, 'settings', 'prices'), {
         vpnPrice: Number(v),
         internetVpnPrice: Number(i),
-        promoPrice: Number(p)
+        promoPrice: Number(p),
+        billing_system_license: Number(b) // <--- IDINAGDAG
       });
       alert("System Initialized & Prices Saved!");
     }
@@ -501,33 +503,46 @@ export default function AdminPanel({
 
         {/* --- TAB CONTENT: SETTINGS (Pricing) --- */}
         {adminTab === 'settings' && (
-          <div className="max-w-md mx-auto bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8 animate-in zoom-in-95 shadow-2xl">
-            <div className="text-center">
-              <IconEdit />
-              <h2 className="text-lg font-black uppercase text-blue-500 italic mt-3">Core Pricing</h2>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Global System Configuration</p>
+          <div className="max-w-md mx-auto space-y-8 animate-in zoom-in-95 shadow-2xl">
+            {/* PRICING CARD */}
+            <div className="bg-slate-900 p-10 rounded-[50px] border border-slate-800 space-y-8">
+              <div className="text-center">
+                <IconEdit />
+                <h2 className="text-lg font-black uppercase text-blue-500 italic mt-3">Core Pricing</h2>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Global System Configuration</p>
+              </div>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                updateSystemPrices(
+                  e.target.vpn.value, 
+                  e.target.internet.value, 
+                  e.target.promo.value,
+                  e.target.billing.value // <--- IDINAGDAG
+                );
+              }} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Remote Access (Yearly Price)</label>
+                  <input name="vpn" type="number" defaultValue={prices?.vpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500 transition-all" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Internet VPN (Monthly Price)</label>
+                  <input name="internet" type="number" defaultValue={prices?.internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500 transition-all" />
+                </div>
+                {/* --- IDINAGDAG: BILLING LICENSE PRICE --- */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Billing System License (Monthly)</label>
+                  <input name="billing" type="number" defaultValue={prices?.billing_system_license || 150} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-400 focus:border-blue-400 transition-all" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Reseller Promo Price</label>
+                  <input name="promo" type="number" defaultValue={prices?.promoPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-orange-500 focus:border-orange-500 transition-all" />
+                </div>
+                <button className="w-full bg-blue-600 py-6 rounded-[30px] font-black uppercase text-xs shadow-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-2">
+                  <IconCheck /> Save Pricing Changes
+                </button>
+              </form>
             </div>
-            
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              updateSystemPrices(e.target.vpn.value, e.target.internet.value, e.target.promo.value);
-            }} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Remote Access (Yearly Price)</label>
-                <input name="vpn" type="number" defaultValue={prices?.vpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500 transition-all" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Internet VPN (Monthly Price)</label>
-                <input name="internet" type="number" defaultValue={prices?.internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500 transition-all" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Reseller Promo Price</label>
-                <input name="promo" type="number" defaultValue={prices?.promoPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-orange-500 focus:border-orange-500 transition-all" />
-              </div>
-              <button className="w-full bg-blue-600 py-6 rounded-[30px] font-black uppercase text-xs shadow-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-2">
-                <IconCheck /> Save Pricing Changes
-              </button>
-            </form>
 
             {/* ANNOUNCEMENT CARD */}
             <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
