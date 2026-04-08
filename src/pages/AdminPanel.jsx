@@ -508,65 +508,63 @@ export default function AdminPanel({
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Global System Configuration</p>
             </div>
             
-            {/* Pricing Form */}
             <form onSubmit={(e) => {
               e.preventDefault();
-              // I-pass ang mga inputted values sa handler
               updateSystemPrices(e.target.vpn.value, e.target.internet.value, e.target.promo.value);
             }} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Remote Access (Yearly Price)</label>
-                <input name="vpn" type="number" defaultValue={prices.vpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500 transition-all" />
+                <input name="vpn" type="number" defaultValue={prices?.vpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500 transition-all" />
               </div>
-              
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Internet VPN (Monthly Price)</label>
-                <input name="internet" type="number" defaultValue={prices.internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500 transition-all" />
+                <input name="internet" type="number" defaultValue={prices?.internetVpnPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-blue-500 focus:border-blue-500 transition-all" />
               </div>
-
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Reseller Promo Price (saving code)</label>
-                <input name="promo" type="number" defaultValue={prices.promoPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-orange-500 focus:border-orange-500 transition-all" />
+                <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Reseller Promo Price</label>
+                <input name="promo" type="number" defaultValue={prices?.promoPrice} className="w-full bg-slate-950 p-5 rounded-2xl font-black border border-slate-800 outline-none text-orange-500 focus:border-orange-500 transition-all" />
               </div>
-
               <button className="w-full bg-blue-600 py-6 rounded-[30px] font-black uppercase text-xs shadow-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-2">
                 <IconCheck /> Save Pricing Changes
               </button>
             </form>
-            // UI para sa Admin (Simple Controls):
+
+            {/* ANNOUNCEMENT CARD */}
             <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
               <h3 className="text-blue-500 font-black uppercase text-[10px] tracking-widest">Global Announcement</h3>
               <textarea 
                 className="w-full bg-slate-950 p-4 rounded-xl text-xs font-bold text-white outline-none border border-slate-800 focus:border-blue-500"
                 placeholder="Type your announcement here..."
-                value={announcement.text}
+                value={announcement?.text || ""}
                 onChange={(e) => setAnnouncement({...announcement, text: e.target.value})}
               />
               <div className="flex gap-4">
-                <button onClick={() => saveAnnouncement({ ...announcement, isActive: !announcement.isActive })} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] ${announcement.isActive ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
-                  {announcement.isActive ? "Turn Off Banner" : "Go Live"}
+                <button 
+                  onClick={() => saveAnnouncement({ ...announcement, isActive: !announcement?.isActive })} 
+                  className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] ${announcement?.isActive ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}
+                >
+                  {announcement?.isActive ? "Turn Off Banner" : "Go Live"}
                 </button>
                 <button onClick={() => saveAnnouncement(announcement)} className="bg-blue-600 px-8 py-3 rounded-xl font-black uppercase text-[10px]">Update Message</button>
               </div>
             </div>
 
-            {/* --- MAINTENANCE LOCKDOWN CARD --- */}
+            {/* MAINTENANCE CARD */}
             <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl mt-8 border-t-4 border-t-orange-600">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3 text-orange-500">
                   <h2 className="text-sm font-black uppercase italic tracking-widest">System Lockdown</h2>
                 </div>
-                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${maint.isActive ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-800 text-slate-500'}`}>
-                  {maint.isActive ? 'SYSTEM DOWN' : 'SYSTEM LIVE'}
+                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${maint?.isActive ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-800 text-slate-500'}`}>
+                  {maint?.isActive ? 'SYSTEM DOWN' : 'SYSTEM LIVE'}
                 </div>
               </div>
 
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none px-2">Lockdown Message</p>
-              
               <textarea 
                 className="w-full bg-slate-950 border border-slate-800 p-5 rounded-[2rem] outline-none focus:border-orange-500 font-bold text-xs text-white min-h-[120px] resize-none transition-all"
-                placeholder="Write the reason for maintenance (e.g., Server Node Optimization)..."
-                value={maint.message}
+                placeholder="Reason for maintenance..."
+                value={maint?.message || ""}
                 onChange={(e) => setMaint({...maint, message: e.target.value})}
               />
 
@@ -575,19 +573,18 @@ export default function AdminPanel({
                   onClick={async () => {
                     try {
                       const mRef = doc(db, ...base, 'settings', 'maintenance');
-                      await setDoc(mRef, { ...maint, isActive: !maint.isActive }, { merge: true });
-                      alert(`SYSTEM ${!maint.isActive ? 'LOCKED' : 'UNLOCKED'} SUCCESSFULY!`);
+                      await setDoc(mRef, { ...maint, isActive: !maint?.isActive }, { merge: true });
+                      alert(`SYSTEM ${!maint?.isActive ? 'LOCKED' : 'UNLOCKED'} SUCCESSFULY!`);
                     } catch (err) { alert("Error: " + err.message); }
                   }}
-                  className={`w-full py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all ${maint.isActive ? 'bg-red-600 hover:bg-red-500 shadow-xl shadow-red-600/20' : 'bg-orange-600 hover:bg-orange-500 shadow-xl shadow-orange-600/20'}`}
+                  className={`w-full py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all ${maint?.isActive ? 'bg-red-600 hover:bg-red-500 shadow-xl shadow-red-600/20' : 'bg-orange-600 hover:bg-orange-500 shadow-xl shadow-orange-600/20'}`}
                 >
-                  {maint.isActive ? 'STOP MAINTENANCE' : 'ACTIVATE MAINTENANCE'}
+                  {maint?.isActive ? 'STOP MAINTENANCE' : 'ACTIVATE MAINTENANCE'}
                 </button>
-                
                 <button 
                   onClick={async () => {
                     const mRef = doc(db, ...base, 'settings', 'maintenance');
-                    await setDoc(mRef, { message: maint.message }, { merge: true });
+                    await setDoc(mRef, { message: maint?.message || "" }, { merge: true });
                     alert("Maintenance Message Updated!");
                   }}
                   className="w-full py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest text-slate-500 border border-slate-800 hover:bg-slate-800 transition-all"
@@ -595,10 +592,6 @@ export default function AdminPanel({
                   Update Message Only
                 </button>
               </div>
-
-              <p className="text-[8px] text-slate-700 text-center font-black uppercase italic leading-tight">
-                Note: Activating this will block all clients immediately.<br/>Admin access remains unrestricted.
-              </p>
             </div>
           </div>
         )}

@@ -102,7 +102,7 @@ export default function App() {
       });
 
     // Cleanup para hindi mabagal ang app
-    return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); unMaint() };
+    return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); unMaint(); unAnnounce(); };
   }, [user]);
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono animate-pulse">SWIFFTNET CORE STARTING...</div>;
@@ -110,7 +110,7 @@ export default function App() {
   const commonProps = {
     user, db, base, appId: "swifftnet-remote-v3", ADMIN_EMAIL,
     payments, requests, assignments, tickets, promos, prices,
-    sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody, announcement, setAnnouncement
+    sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody, announcement, setAnnouncement, maint, setMaint
   };
 
   if (maint.isActive && user?.role !== 'admin') {
