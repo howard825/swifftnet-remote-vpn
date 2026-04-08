@@ -281,74 +281,79 @@ export default function AdminPanel({
         )}
 
         {/* --- TAB CONTENT: REQUESTS --- */}
-        {adminTab === 'requests' && (
-          <div className="grid md:grid-cols-2 gap-12">
-            {/* I-filter para ipakita lang ang pending requests (New, Trial, Renewal) */}
-            {requests.filter(r => r.status === 'pending').length === 0 && (
-              <p className="text-[11px] text-slate-600 uppercase font-black italic text-center col-span-2 py-10">No pending requests.</p>
-            )}
-            {requests.filter(r => r.status === 'pending').map(r => (
-              <div key={r.id} className="bg-slate-900 p-12 rounded-[60px] border border-slate-800 shadow-2xl space-y-8 animate-in slide-in-from-left-4 relative">
-                
-                {/* Badge para sa Request Type */}
-                <span className={`absolute top-8 right-8 px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${r.type === 'trial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' : r.type === 'renewal' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-blue-500/10 text-blue-500 border-blue-500/30'}`}>
-                  {(r.type || 'new').toUpperCase()} REQUEST
-                </span>
-
-                <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6 pr-20">{r.email}</p>
-                
-                {/* Admin Assignment Form */}
-                <form onSubmit={(e) => { 
-                  e.preventDefault(); 
-                  const fd = new FormData(e.target); 
-                  adminAssignTunnel(r.id, r.email, { 
-                    days: fd.get('d'), // Inputted days
-                    u: fd.get('u'),    // VPN User
-                    p: fd.get('p'),    // VPN Pass
-                    port: fd.get('port'), // Port 1 (Winbox)
-                    portAux: fd.get('portAux'), // Port 2 (SSH/API)
-                    webPort: fd.get('webPort'), // <--- IDINAGDAG (Silent Monitor Port)
-                    service: r.service || 'winbox' // Default service
-                  }, r.type, r.vpnId, r.category); // Pass important request metadata
-                }} className="space-y-6">
+        {/* --- TAB CONTENT: REQUESTS --- */}
+          {adminTab === 'requests' && (
+            <div className="grid md:grid-cols-2 gap-12">
+              {/* I-filter para ipakita lang ang pending requests */}
+              {requests.filter(r => r.status === 'pending').length === 0 && (
+                <p className="text-[11px] text-slate-600 uppercase font-black italic text-center col-span-2 py-10">No pending requests.</p>
+              )}
+              {requests.filter(r => r.status === 'pending').map(r => (
+                <div key={r.id} className="bg-slate-900 p-12 rounded-[60px] border border-slate-800 shadow-2xl space-y-8 animate-in slide-in-from-left-4 relative">
                   
-                  {/* Days input: Default values base sa request type at category */}
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Subscription Days</label>
-                    <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : (r.category === 'internet' ? "30" : "365")} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500" />
+                  {/* --- PROTOCOL & TYPE BADGES --- */}
+                  <div className="absolute top-8 right-8 flex flex-col items-end gap-2">
+                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${r.type === 'trial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' : 'bg-blue-500/10 text-blue-500 border-blue-500/30'}`}>
+                      {(r.type || 'new').toUpperCase()} REQUEST
+                    </span>
+                    
+                    {/* ETO ANG DINAGDAG: PROTOCOL INDICATOR */}
+                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border shadow-lg ${r.protocol === 'sstp' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-blue-600 text-white border-blue-400'}`}>
+                      PREFERENCE: {r.protocol || 'L2TP'}
+                    </span>
                   </div>
 
-                  {/* VPN Credentials */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <input name="u" placeholder="Generate VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
-                    <input name="p" placeholder="Generate VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
-                  </div>
+                  <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6 pr-40">{r.email}</p>
                   
-                  {/* Port Assignments (Triple Input Grid) */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[7px] text-slate-700 font-black uppercase text-center">Winbox</p>
-                      <input name="port" placeholder="Port 1" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
+                  {/* Admin Assignment Form */}
+                  <form onSubmit={(e) => { 
+                    e.preventDefault(); 
+                    const fd = new FormData(e.target); 
+                    adminAssignTunnel(r.id, r.email, { 
+                      days: fd.get('d'), 
+                      u: fd.get('u'),    
+                      p: fd.get('p'),    
+                      port: fd.get('port'), 
+                      portAux: fd.get('portAux'), 
+                      webPort: fd.get('webPort'), 
+                      service: r.service || 'winbox' 
+                    }, r.type, r.vpnId, r.category); 
+                  }} className="space-y-6">
+                    
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Subscription Days</label>
+                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : (r.category === 'internet' ? "30" : "365")} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500" />
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[7px] text-slate-700 font-black uppercase text-center">SSH/API</p>
-                      <input name="portAux" placeholder="Port 2" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[7px] text-orange-600 font-black uppercase text-center">Silent Port</p>
-                      <input name="webPort" placeholder="Web" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-orange-500 outline-none border border-slate-800 focus:border-orange-500" />
-                    </div>
-                  </div>
 
-                  {/* Submit Button */}
-                  <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3">
-                    <IconShield /> AUTHORIZE & DEPLOY NODE
-                  </button>
-                </form>
-              </div>
-            ))}
-          </div>
-        )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <input name="u" placeholder="Generate VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
+                      <input name="p" placeholder="Generate VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
+                    </div>
+                    
+                    {/* Port Assignments */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[7px] text-slate-700 font-black uppercase text-center">Winbox</p>
+                        <input name="port" placeholder="Port 1" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[7px] text-slate-700 font-black uppercase text-center">SSH/API</p>
+                        <input name="portAux" placeholder="Port 2" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[7px] text-orange-600 font-black uppercase text-center">Silent Port</p>
+                        <input name="webPort" placeholder="Web" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-orange-500 outline-none border border-slate-800 focus:border-orange-500" />
+                      </div>
+                    </div>
+
+                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3">
+                      <IconShield /> AUTHORIZE & DEPLOY NODE
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
 
         {/* --- TAB CONTENT: TICKETS --- */}
         {adminTab === 'tickets' && (
