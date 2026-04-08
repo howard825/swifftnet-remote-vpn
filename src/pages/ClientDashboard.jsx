@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import NetworkToolbox from '../components/NetworkToolbox';
+import NetworkUtils from '../components/NetworkUtils';
 
 // Imports para sa UI Icons (Inaakalang nasa src/components/Icons.jsx)
 import { 
@@ -170,6 +171,19 @@ export default function ClientDashboard({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+    const updateNickname = async (id, currentName) => {
+    const newName = prompt("Enter a nickname for this node (e.g. Office Router, Home Lab):", currentName || "");
+    if (newName === null) return; // Cancelled
+    
+    try {
+      const nodeRef = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', id);
+      await updateDoc(nodeRef, { nickname: newName });
+      // Automatic na mag-u-update ang UI dahil sa onSnapshot listener sa App.jsx
+    } catch (err) {
+      alert("Error updating nickname: " + err.message);
+    }
+  };
+
   // --- UI RENDER ---
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans">
@@ -238,6 +252,7 @@ export default function ClientDashboard({
           
           {/* LEFT: ACTIVE NODES */}
           <div className="lg:col-span-2 space-y-10">
+            <NetworkUtils />
             <NetworkToolbox />
             <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase italic font-mono"><IconShield /> Remote Instances</h2>
             
@@ -285,7 +300,7 @@ export default function ClientDashboard({
                   <div className="px-12 py-6 bg-slate-800/40 flex justify-between items-center border-b border-slate-800 rounded-t-[50px]">
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${asgn.isOnline ? 'bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
-                      <span className="text-[10px] font-black text-slate-500 uppercase font-mono">Port: {asgn.port} | {(asgn.service || 'winbox').toUpperCase()}</span>
+                      <span onClick={() => updateNickname(asgn.id, asgn.nickname)} className="text-sm font-black text-white uppercase italic cursor-pointer hover:text-blue-400 transition-colors">{asgn.nickname || "Set Nickname +"}</span>
                     </div>
                     <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${isExpired ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                       {isExpired ? 'EXPIRED' : asgn.isOnline ? 'CONNECTED' : 'STANDBY'}
