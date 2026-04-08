@@ -26,6 +26,7 @@ export default function Navbar({ user, handleLogout }) {
         {/* 2. NAVIGATION LINKS */}
         <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8">
           <Link to="/" className="text-[10px] font-black uppercase text-slate-400 hover:text-white transition-colors tracking-widest">Home</Link>
+          <Link to="/help" className="text-[10px] font-black uppercase text-slate-500 hover:text-white transition-colors tracking-widest">Help Center</Link>
           <Link to="/about" className="text-[10px] font-black uppercase text-slate-400 hover:text-white transition-colors tracking-widest">About Us</Link>
           <Link to="/privacy-policy" className="text-[10px] font-black uppercase text-slate-500 hover:text-blue-500 transition-colors tracking-widest">Privacy</Link>
           <Link to="/terms-of-use" className="text-[10px] font-black uppercase text-slate-500 hover:text-emerald-500 transition-colors tracking-widest">Terms</Link>

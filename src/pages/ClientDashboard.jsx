@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import AnnouncementBanner from '../components/AnnouncementBanner';
+import NetworkToolbox from '../components/NetworkToolbox';
 
 // Imports para sa UI Icons (Inaakalang nasa src/components/Icons.jsx)
 import { 
@@ -24,6 +26,7 @@ export default function ClientDashboard({
   openSupport,    // Intergram opener
   sendEmail,      // EmailJS function
   setView,
+  announcement,
   
   // Support Modal Props
   activeTicket, 
@@ -170,6 +173,8 @@ export default function ClientDashboard({
   // --- UI RENDER ---
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans">
+      {/* 1. ANNOUNCEMENT BANNER - GLOBAL BROADCAST */}
+      <AnnouncementBanner announcement={announcement} />
       <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* HEADER */}
@@ -233,6 +238,7 @@ export default function ClientDashboard({
           
           {/* LEFT: ACTIVE NODES */}
           <div className="lg:col-span-2 space-y-10">
+            <NetworkToolbox />
             <h2 className="text-xl font-black flex items-center gap-4 text-blue-400 uppercase italic font-mono"><IconShield /> Remote Instances</h2>
             
             {assignments.length === 0 && (
@@ -316,6 +322,18 @@ export default function ClientDashboard({
                         </div>
                       </>
                     )}
+
+                    {/* PROGRESS BAR LOGIC */}
+                    <div className="w-full bg-slate-950 h-1.5 rounded-full mt-3 overflow-hidden border border-slate-800/50">
+                      <div 
+                        className={`h-full transition-all duration-1000 ${
+                          ((new Date(asgn.expiry).getTime() - new Date().getTime()) / (365 * 24 * 60 * 60 * 1000)) * 100 < 15 
+                          ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' 
+                          : 'bg-blue-500'
+                        }`} 
+                        style={{ width: `${Math.max(0, Math.min(100, ((new Date(asgn.expiry).getTime() - new Date().getTime()) / (365 * 24 * 60 * 60 * 1000)) * 100))}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -341,6 +359,25 @@ export default function ClientDashboard({
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="bg-slate-900/50 p-8 rounded-[40px] border border-blue-500/20 space-y-4 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-150 transition-transform"><IconShield /></div>
+              <h3 className="text-[10px] font-black uppercase text-blue-400 tracking-widest italic">Affiliate Program</h3>
+              <p className="text-[10px] text-slate-500 font-medium leading-relaxed italic">Earn 10% credits for every successful referral.</p>
+              <div className="flex gap-2">
+                <input 
+                  readOnly 
+                  value={`${window.location.origin}/login?ref=${user.uid}`} 
+                  className="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl text-[8px] font-mono text-slate-500 outline-none"
+                />
+                <button 
+                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/login?ref=${user.uid}`); alert("Link Copied!"); }}
+                  className="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-xl text-[8px] font-black uppercase transition-all shadow-lg shadow-blue-600/20"
+                >
+                  Copy
+                </button>
               </div>
             </section>
 

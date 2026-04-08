@@ -16,12 +16,14 @@ import AdminPanel from './pages/AdminPanel';
 import ClientDashboard from './pages/ClientDashboard';
 import Profile from './pages/Profile';
 import About from './pages/About';
+import HelpCenter from './pages/HelpCenter';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [maint, setMaint] = useState({ isActive: false, message: "" });
 
   // DATA STATES (Shared Props)
   const [payments, setPayments] = useState([]);
@@ -33,6 +35,7 @@ export default function App() {
   const [activeTicket, setActiveTicket] = useState(null);
   const [messages, setMessages] = useState([]);
   const [replyBody, setReplyBody] = useState("");
+  const [announcement, setAnnouncement] = useState({ text: "", isActive: false, type: "info" });
 
   const handleLogout = () => signOut(auth).then(() => window.location.href = "/");
   const sendEmail = (to, sub, msg, id) => emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, { to_email: to, subject: `[${id}] ${sub}`, message: msg }, EJS_PUBLIC_KEY);
@@ -90,8 +93,16 @@ export default function App() {
         }
       });
 
+    const unAnnounce = onSnapshot(doc(db, ...base, 'settings', 'announcement'), (s) => {
+        if (s.exists()) setAnnouncement(s.data());
+      });
+
+    const unMaint = onSnapshot(doc(db, ...base, 'settings', 'maintenance'), (s) => {
+        if (s.exists()) setMaint(s.data());
+      });
+
     // Cleanup para hindi mabagal ang app
-    return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); };
+    return () => { unp(); unr(); una(); unt(); unpromo(); unprice(); unMaint() };
   }, [user]);
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono animate-pulse">SWIFFTNET CORE STARTING...</div>;
@@ -99,8 +110,18 @@ export default function App() {
   const commonProps = {
     user, db, base, appId: "swifftnet-remote-v3", ADMIN_EMAIL,
     payments, requests, assignments, tickets, promos, prices,
-    sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody
+    sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody, announcement, setAnnouncement
   };
+
+  if (maint.isActive && user?.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center text-blue-500 animate-pulse mb-6 text-4xl">⚙️</div>
+        <h1 className="text-4xl font-black uppercase italic text-white mb-2 tracking-tighter">System Optimization</h1>
+        <p className="text-slate-500 max-w-md font-medium italic text-sm">{maint.message || "We are currently optimizing SwifftNet nodes. We'll be back shortly!"}</p>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -114,6 +135,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/profile" element={user ? <Profile {...commonProps} /> : <Navigate to="/login" />} />
         <Route path="/about" element={<About />} />
+        <Route path="/help" element={<HelpCenter />} />
 
         {/* LOGIN: Redirects to dashboard if already logged in */}
         <Route path="/login" element={

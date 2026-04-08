@@ -17,6 +17,10 @@ export default function AdminPanel({
   assignments,    // Listahan ng lahat ng VPN assignments/nodes
   promos,         // Listahan ng lahat ng active promo codes
   prices,         // Object na naglalaman ng vpnPrice, internetVpnPrice, promoPrice
+  maint,           // <--- IDINAGDAG
+  setMaint,        // <--- IDINAGDAG
+  announcement,    // (Siguraduhin na nandito rin ito base sa code mo)
+  setAnnouncement, // (Siguraduhin na nandito rin ito base sa code mo)
   db,             // Firebase Firestore database instance mula sa config
   appId,          // SwifftNet App ID constant
   base,           // Firestore base path array constant
@@ -220,6 +224,8 @@ export default function AdminPanel({
     );
     alert(`Activation resent to ${asgn.clientEmail}`);
   };
+
+  const saveAnnouncement = async (data) => await setDoc(doc(db, ...base, 'settings', 'announcement'), data, { merge: true });
 
   // --- RENDERING ADMIN UI ---
   // Siguraduhing ang user ay ikaw (Admin) bago i-render ang buong page
@@ -527,6 +533,73 @@ export default function AdminPanel({
                 <IconCheck /> Save Pricing Changes
               </button>
             </form>
+            // UI para sa Admin (Simple Controls):
+            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
+              <h3 className="text-blue-500 font-black uppercase text-[10px] tracking-widest">Global Announcement</h3>
+              <textarea 
+                className="w-full bg-slate-950 p-4 rounded-xl text-xs font-bold text-white outline-none border border-slate-800 focus:border-blue-500"
+                placeholder="Type your announcement here..."
+                value={announcement.text}
+                onChange={(e) => setAnnouncement({...announcement, text: e.target.value})}
+              />
+              <div className="flex gap-4">
+                <button onClick={() => saveAnnouncement({ ...announcement, isActive: !announcement.isActive })} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] ${announcement.isActive ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
+                  {announcement.isActive ? "Turn Off Banner" : "Go Live"}
+                </button>
+                <button onClick={() => saveAnnouncement(announcement)} className="bg-blue-600 px-8 py-3 rounded-xl font-black uppercase text-[10px]">Update Message</button>
+              </div>
+            </div>
+
+            {/* --- MAINTENANCE LOCKDOWN CARD --- */}
+            <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl mt-8 border-t-4 border-t-orange-600">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3 text-orange-500">
+                  <h2 className="text-sm font-black uppercase italic tracking-widest">System Lockdown</h2>
+                </div>
+                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${maint.isActive ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-800 text-slate-500'}`}>
+                  {maint.isActive ? 'SYSTEM DOWN' : 'SYSTEM LIVE'}
+                </div>
+              </div>
+
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none px-2">Lockdown Message</p>
+              
+              <textarea 
+                className="w-full bg-slate-950 border border-slate-800 p-5 rounded-[2rem] outline-none focus:border-orange-500 font-bold text-xs text-white min-h-[120px] resize-none transition-all"
+                placeholder="Write the reason for maintenance (e.g., Server Node Optimization)..."
+                value={maint.message}
+                onChange={(e) => setMaint({...maint, message: e.target.value})}
+              />
+
+              <div className="space-y-3">
+                <button 
+                  onClick={async () => {
+                    try {
+                      const mRef = doc(db, ...base, 'settings', 'maintenance');
+                      await setDoc(mRef, { ...maint, isActive: !maint.isActive }, { merge: true });
+                      alert(`SYSTEM ${!maint.isActive ? 'LOCKED' : 'UNLOCKED'} SUCCESSFULY!`);
+                    } catch (err) { alert("Error: " + err.message); }
+                  }}
+                  className={`w-full py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all ${maint.isActive ? 'bg-red-600 hover:bg-red-500 shadow-xl shadow-red-600/20' : 'bg-orange-600 hover:bg-orange-500 shadow-xl shadow-orange-600/20'}`}
+                >
+                  {maint.isActive ? 'STOP MAINTENANCE' : 'ACTIVATE MAINTENANCE'}
+                </button>
+                
+                <button 
+                  onClick={async () => {
+                    const mRef = doc(db, ...base, 'settings', 'maintenance');
+                    await setDoc(mRef, { message: maint.message }, { merge: true });
+                    alert("Maintenance Message Updated!");
+                  }}
+                  className="w-full py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest text-slate-500 border border-slate-800 hover:bg-slate-800 transition-all"
+                >
+                  Update Message Only
+                </button>
+              </div>
+
+              <p className="text-[8px] text-slate-700 text-center font-black uppercase italic leading-tight">
+                Note: Activating this will block all clients immediately.<br/>Admin access remains unrestricted.
+              </p>
+            </div>
           </div>
         )}
 
