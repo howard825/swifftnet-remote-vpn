@@ -214,36 +214,8 @@ export default function ClientDashboard({
             <p className="text-5xl font-black">₱{bal}</p>
           </div>
 
-          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-[40px] text-center shadow-xl">
-            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">{serviceCategory === 'remote' ? 'Remote Access' : 'Internet VPN'}</p>
-            <p className="text-4xl font-black text-emerald-500">₱{currentPrice}</p>
-            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">{serviceCategory === 'remote' ? 'Per Node / Year' : 'Per Account / Month'}</p>
-          </div>
-
-          <div className="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-[40px] flex flex-col justify-center gap-6 shadow-xl">
-            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
-              <button onClick={() => setServiceCategory('remote')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'remote' ? 'bg-blue-600' : 'text-slate-600'}`}>Remote Access</button>
-              <button onClick={() => setServiceCategory('internet')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'internet' ? 'bg-emerald-600' : 'text-slate-600'}`}>Internet VPN</button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-blue-400 outline-none">
-                <option value="winbox">Winbox</option>
-                {serviceCategory === 'internet' && <option value="internet">Internet</option>}
-                <option value="api">API</option>
-                <option value="ssh">SSH</option>
-              </select>
-              <select value={vpnProtocol} onChange={(e)=>setVpnProtocol(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-emerald-400">
-                <option value="l2tp">L2TP</option>
-                <option value="sstp">SSTP</option>
-              </select>
-              <div className="flex gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
-                <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="PROMO?" className="bg-transparent px-3 outline-none text-[10px] font-black w-full" />
-                <button onClick={validatePromo} className="bg-slate-800 px-4 py-2 rounded-lg text-[8px] font-black">Apply</button>
-              </div>
-              <button onClick={()=>handleVpnRequest()} disabled={!canAfford} className={`py-4 rounded-xl font-black text-[10px] uppercase transition-all ${canAfford ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}>
-                {canAfford ? 'Buy Now' : 'Refill Balance'}
-              </button>
-              {/* --- BILLING SYSTEM ACCESS CARD --- */}
+          {/* --- BILLING SYSTEM ACCESS CARD --- */}
+          {/* --- BILLING SYSTEM ACCESS CARD --- */}
               <div className="bg-slate-900/50 p-8 rounded-[45px] border border-slate-800 flex flex-col justify-between group hover:border-emerald-500/30 transition-all shadow-2xl relative overflow-hidden">
                   <div className="flex justify-between items-start mb-6">
                       <div className="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-500">
@@ -273,6 +245,36 @@ export default function ClientDashboard({
                   {/* Background Glow Effect */}
                   <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-600/5 rounded-full blur-3xl group-hover:bg-emerald-600/10 transition-all"></div>
               </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-[40px] text-center shadow-xl">
+            <p className="text-slate-500 text-[10px] font-black uppercase mb-2">{serviceCategory === 'remote' ? 'Remote Access' : 'Internet VPN'}</p>
+            <p className="text-4xl font-black text-emerald-500">₱{currentPrice}</p>
+            <p className="text-[9px] text-slate-600 font-black uppercase mt-2 italic">{serviceCategory === 'remote' ? 'Per Node / Year' : 'Per Account / Month'}</p>
+          </div>
+
+          <div className="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-[40px] flex flex-col justify-center gap-6 shadow-xl">
+            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+              <button onClick={() => setServiceCategory('remote')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'remote' ? 'bg-blue-600' : 'text-slate-600'}`}>Remote Access</button>
+              <button onClick={() => setServiceCategory('internet')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${serviceCategory === 'internet' ? 'bg-emerald-600' : 'text-slate-600'}`}>Internet VPN</button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <select value={requestService} onChange={(e)=>setRequestService(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-blue-400 outline-none">
+                <option value="winbox">Winbox</option>
+                {serviceCategory === 'internet' && <option value="internet">Internet</option>}
+                <option value="api">API</option>
+                <option value="ssh">SSH</option>
+              </select>
+              <select value={vpnProtocol} onChange={(e)=>setVpnProtocol(e.target.value)} className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-[10px] font-black uppercase text-emerald-400">
+                <option value="l2tp">L2TP</option>
+                <option value="sstp">SSTP</option>
+              </select>
+              <div className="flex gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                <input value={promoInput} onChange={(e)=>setPromoInput(e.target.value)} placeholder="PROMO?" className="bg-transparent px-3 outline-none text-[10px] font-black w-full" />
+                <button onClick={validatePromo} className="bg-slate-800 px-4 py-2 rounded-lg text-[8px] font-black">Apply</button>
+              </div>
+              <button onClick={()=>handleVpnRequest()} disabled={!canAfford} className={`py-4 rounded-xl font-black text-[10px] uppercase transition-all ${canAfford ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}>
+                {canAfford ? 'Buy Now' : 'Refill Balance'}
+              </button>
             </div>
           </div>
         </div>
