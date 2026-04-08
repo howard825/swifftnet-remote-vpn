@@ -61,19 +61,37 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     const dynamicPrice = prices?.billing_system_license || base?.billing_system_license || 150; 
     if (bal < dynamicPrice) return alert(`Insufficient balance! Needs ₱${dynamicPrice}`);
 
-    if (window.confirm(`Unlock Billing System for 30 days? ₱${dynamicPrice} will be deducted.`)) {
+    if (window.confirm(`Deduct ₱${dynamicPrice} from credits to unlock Billing for 30 days?`)) {
         setLoading(true);
         try {
             const userRef = doc(db, 'users', user.uid); 
+
+            // --- ETO ANG NAWALA (Definition of expiryDate) ---
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 30);
+
+            // Gamit ang setDoc para siguradong gagawa ng doc kung wala pa
             await setDoc(userRef, { 
                 billingAccessUntil: expiryDate,
                 credits: Number(bal) - Number(dynamicPrice) 
             }, { merge: true });
+
+            // Transaction logging (ito yung record para sa admin)
             await addDoc(collection(db, 'artifacts', appId || 'swifftnet-remote-v3', 'public', 'data', 'payments'), {
-                email: user.email, amount: -dynamicPrice, status: 'confirmed', type: 'billing_license', refNo: `BILL-${Math.random().toString(36).toUpperCase().slice(2,8)}`, date: serverTimestamp()
+                email: user.email, 
+                amount: -dynamicPrice, 
+                status: 'confirmed', 
+                type: 'billing_license', 
+                refNo: `BILL-${Math.random().toString(36).toUpperCase().slice(2,8)}`, 
+                date: serverTimestamp()
             });
+
             alert(`System Unlocked!`);
-        } catch (err) { alert(err.message); } finally { setLoading(false); }
+        } catch (err) { 
+            alert("Error: " + err.message); 
+        } finally { 
+            setLoading(false); 
+        }
     }
   };
 
