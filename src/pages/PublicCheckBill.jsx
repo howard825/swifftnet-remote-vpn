@@ -1,186 +1,200 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore'; // Added doc, getDoc
+import { doc, getDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { IconSearch, IconCheck, IconShield } from '../components/Icons';
+import { IconSearch, IconCheck, IconShield, IconCard } from '../components/Icons';
 
 export default function PublicCheckBill() {
   const [searchParams] = useSearchParams();
-  const wispId = searchParams.get('id'); 
-  
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [wispData, setWispData] = useState(null); // --- FEATURE: WISP SETTINGS STATE ---
+  const clientId = searchParams.get('id'); // Kinukuha ang ?id= sa URL
 
-  // --- FEATURE: FETCH WISP PAYMENT INSTRUCTIONS ---
+  // BRANDING STATES
+  const [wispData, setWispData] = useState({
+    wispName: "SwifftNet Portal",
+    wispLogo: "",
+    primaryColor: "#10b981",
+    paymentInstructions: ""
+  });
+
+  // SEARCH & CUSTOMER STATES
+  const [searchTerm, setSearchTerm] = useState("");
+  const [customer, setCustomer] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [noticeSent, setNoticeSent] = useState(false);
+
+  // 1. FETCH BRANDING (Dynamic Load)
   useEffect(() => {
-    const fetchWispSettings = async () => {
-      if (!wispId) return;
-      try {
-        const docRef = doc(db, 'billing_systems', wispId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setWispData(docSnap.data());
-        }
-      } catch (err) {
-        console.error("Error fetching WISP settings:", err);
+    if (!clientId) return;
+    const fetchBranding = async () => {
+      const docRef = doc(db, 'billing_systems', clientId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setWispData(prev => ({ ...prev, ...snap.data() }));
       }
     };
-    fetchWispSettings();
-  }, [wispId]);
+    fetchBranding();
+  }, [clientId]);
 
+  // 2. SEARCH LOGIC
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!wispId) return alert("Invalid WISP Link. Please ask your provider for the correct link.");
-    if (!search.trim()) return;
-
+    if (!searchTerm || !clientId) return;
     setLoading(true);
-    setResults(null);
+    setCustomer(null);
+
     try {
-      const customersRef = collection(db, 'billing_systems', wispId, 'customers');
-      const q = query(customersRef, where('name', '==', search.toUpperCase()));
-      const snap = await getDocs(q);
+      // Naghahanap sa sub-collection ng specific client
+      const q = query(
+        collection(db, 'billing_systems', clientId, 'customers'),
+        where('name', '==', searchTerm.toUpperCase())
+      );
       
-      if (!snap.empty) {
-        setResults(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } else {
-        setResults([]);
-      }
+      onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          setCustomer({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        } else {
+          alert("Customer not found. Please check the spelling.");
+        }
+        setLoading(false);
+      });
     } catch (err) {
-      console.error(err);
-      alert("Error accessing database.");
-    } finally {
+      alert(err.message);
       setLoading(false);
     }
   };
 
-  const getStatus = (client) => {
-    const today = new Date();
-    const currentDay = today.getDate();
-    const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
-    const isPaid = client.lastPaidMonth === currentMonthYear;
+  // 3. SUBMIT PAYMENT NOTICE
+  const submitNotice = async (e) => {
+    e.preventDefault();
+    const refNo = e.target.refNo.value;
+    if (!refNo) return;
 
-    if (isPaid) return { text: "FULLY PAID", color: "bg-emerald-600", border: "border-emerald-500/50" };
-    if (currentDay > Number(client.dueDate)) return { text: "OVERDUE", color: "bg-red-600 animate-pulse", border: "border-red-500/50" };
-    return { text: "PENDING", color: "bg-orange-600", border: "border-orange-500/50" };
+    try {
+      await addDoc(collection(db, 'billing_systems', clientId, 'notices'), {
+        customerId: customer.id,
+        customerName: customer.name,
+        refNo: refNo,
+        amount: customer.monthlyFee,
+        status: 'pending',
+        timestamp: serverTimestamp()
+      });
+      setNoticeSent(true);
+    } catch (err) { alert(err.message); }
   };
 
+  // HELPER: STATUS CHECK
+  const getStatus = (c) => {
+    const today = new Date();
+    const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
+    if (c.lastPaidMonth === currentMonthYear) return 'PAID';
+    if (today.getDate() > Number(c.dueDate)) return 'OVERDUE';
+    return 'PENDING';
+  };
+
+  if (!clientId) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 font-black">INVALID PORTAL LINK</div>;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 font-sans">
-      <div className="max-w-md w-full space-y-12">
+    <div className="min-h-screen bg-slate-950 text-white font-sans p-6 md:p-12 flex flex-col items-center">
+      
+      {/* DYNAMIC HEADER */}
+      <header className="w-full max-w-2xl text-center mb-12 space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
+        {wispData.wispLogo && (
+          <img src={wispData.wispLogo} alt="Logo" className="w-24 h-24 mx-auto rounded-3xl object-contain mb-4 shadow-2xl" />
+        )}
+        <h1 className="text-4xl font-black uppercase italic tracking-tighter" style={{ color: wispData.primaryColor }}>
+          {wispData.wispName}
+        </h1>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">Official Billing Portal</p>
+      </header>
+
+      <main className="w-full max-w-xl space-y-8">
         
-        {/* BRANDING */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-black uppercase italic tracking-tighter">
-            <span className="text-emerald-500 underline">SwifftNet</span> Billing
-          </h1>
-          <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">Customer Portal</p>
-        </div>
-
-        {/* SEARCH FORM */}
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="relative group">
+        {/* SEARCH BOX */}
+        {!customer && (
+          <form onSubmit={handleSearch} className="bg-slate-900 p-2 rounded-[2.5rem] border border-slate-800 flex items-center shadow-2xl">
             <input 
-              value={search} 
-              onChange={e => setSearch(e.target.value)}
-              placeholder="ENTER REGISTERED NAME"
-              className="w-full bg-slate-900 border border-slate-800 p-6 rounded-[35px] text-center font-black text-lg outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-700 shadow-2xl"
+              className="flex-1 bg-transparent p-6 outline-none font-black uppercase text-sm placeholder:text-slate-700"
+              placeholder="ENTER FULL NAME..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
             />
-          </div>
-          <button 
-            disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 py-6 rounded-[35px] font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-3"
-          >
-            {loading ? "SEARCHING..." : "CHECK BILLING STATUS"}
-          </button>
-        </form>
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="p-6 rounded-[2rem] transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: wispData.primaryColor }}
+            >
+              <IconSearch className="w-6 h-6 text-slate-950" />
+            </button>
+          </form>
+        )}
 
-        {/* RESULTS SECTION */}
-        <div className="min-h-[200px]">
-          {results && results.length > 0 ? (
-            results.map(client => {
-              const status = getStatus(client);
-              return (
-                <div key={client.id} className={`bg-slate-900 p-8 rounded-[45px] border ${status.border} shadow-2xl space-y-8 animate-in zoom-in-95`}>
-                   <div className="text-center">
-                     <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Billing Statement for</p>
-                     <h2 className="text-2xl font-black italic uppercase text-white">{client.name}</h2>
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-black/40 p-6 rounded-3xl border border-slate-800 text-center">
-                         <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Monthly Fee</p>
-                         <p className="text-2xl font-black text-white italic">₱{client.monthlyFee}</p>
-                      </div>
-                      <div className="bg-black/40 p-6 rounded-3xl border border-slate-800 text-center">
-                         <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Due Date</p>
-                         <p className="text-2xl font-black text-white italic">Day {client.dueDate}</p>
-                      </div>
-                   </div>
-
-                   <div className={`w-full py-5 rounded-3xl text-center font-black text-xs tracking-widest ${status.color}`}>
-                      {status.text}
-                   </div>
-
-                   {/* --- FEATURE: PAYMENT INSTRUCTIONS (Shown if not fully paid) --- */}
-                   {status.text !== "FULLY PAID" && (
-                     <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-[30px] space-y-3 animate-in fade-in slide-in-from-bottom-2">
-                        <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest italic flex items-center gap-2">
-                          <IconCheck className="w-3 h-3"/> Payment Instructions
-                        </p>
-                        <div className="text-xs font-bold text-slate-200 leading-relaxed whitespace-pre-wrap">
-                          {wispData?.paymentInstructions || "Please contact your WISP Administrator for payment details."}
-                        </div>
-                     </div>
-                   )}
-
-                   {/* --- FEATURE: SUBMIT PROOF OF PAYMENT NOTICE --- */}
-                    <button 
-                    onClick={() => {
-                        const ref = prompt("Please enter your GCash Reference Number:");
-                        if (ref) {
-                        // Mag-submit ng notice sa billing_systems -> [WISP_ID] -> notices
-                        addDoc(collection(db, 'billing_systems', wispId, 'notices'), {
-                            customerName: client.name,
-                            customerId: client.id,
-                            refNo: ref,
-                            status: 'pending',
-                            timestamp: serverTimestamp()
-                        });
-                        alert("Payment Notice Sent! Your provider will verify it shortly.");
-                        }
-                    }}
-                    className="w-full bg-white text-black py-4 rounded-3xl font-black uppercase text-[9px] tracking-widest shadow-xl mt-4"
-                    >
-                    I've already paid (Submit Ref No.)
-                    </button>
-
-                   <p className="text-[8px] text-slate-600 text-center font-bold uppercase italic">
-                     System powered by SwifftNet Remote V3
-                   </p>
+        {/* CUSTOMER BILL CARD */}
+        {customer && (
+          <div className="animate-in zoom-in-95 duration-500 space-y-6">
+            <div className="bg-slate-900 rounded-[3rem] border border-slate-800 p-10 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 w-32 h-32 opacity-5" style={{ color: wispData.primaryColor }}><IconCard className="w-full h-full" /></div>
+              
+              <div className="flex justify-between items-start mb-10">
+                <div className="space-y-1">
+                  <h2 className="text-3xl font-black uppercase italic tracking-tighter">{customer.name}</h2>
+                  <p className="text-[10px] text-slate-500 font-black uppercase">Account Verified</p>
                 </div>
-              );
-            })
-          ) : results && (
-            <div className="text-center p-10 bg-red-600/5 rounded-[40px] border border-red-500/10 animate-in fade-in">
-               <p className="text-red-500 font-black uppercase italic text-xs">No records found for that name.</p>
-               <p className="text-[9px] text-slate-600 font-bold uppercase mt-2 leading-relaxed px-4">
-                 Please make sure the name matches the registered name in the ISP database.
-               </p>
-            </div>
-          )}
-        </div>
+                <div className="text-right">
+                  <p className="text-2xl font-black italic" style={{ color: wispData.primaryColor }}>₱{customer.monthlyFee}</p>
+                  <p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Amount Due</p>
+                </div>
+              </div>
 
-        {/* SECURITY NOTE */}
-        {!wispId && (
-          <div className="bg-orange-600/10 p-6 rounded-3xl border border-orange-600/20 text-center">
-            <p className="text-orange-500 font-black text-[10px] uppercase italic">
-              Warning: ISP ID is missing. You cannot check bills without a valid provider link.
-            </p>
+              <div className="grid grid-cols-2 gap-6 border-t border-slate-800 pt-8">
+                <div>
+                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Due Date</p>
+                  <p className="font-black text-sm uppercase italic">Every Day {customer.dueDate}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Payment Status</p>
+                  <p className={`font-black text-sm uppercase italic ${getStatus(customer) === 'PAID' ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {getStatus(customer)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* PAYMENT INSTRUCTIONS */}
+            {getStatus(customer) !== 'PAID' && (
+              <div className="bg-blue-600/5 border border-blue-500/20 rounded-[3rem] p-10 space-y-6">
+                <h3 className="text-xs font-black text-blue-500 uppercase italic flex items-center gap-2">
+                  <IconShield className="w-4 h-4" /> How to Pay
+                </h3>
+                <p className="text-sm font-medium text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  {wispData.paymentInstructions || "Please contact your provider for payment details."}
+                </p>
+
+                {!noticeSent ? (
+                  <form onSubmit={submitNotice} className="space-y-4 pt-4 border-t border-blue-500/10">
+                    <p className="text-[9px] text-slate-500 font-black uppercase">Already paid? Submit Reference Number:</p>
+                    <div className="flex gap-2">
+                      <input name="refNo" required placeholder="REFERENCE NO." className="flex-1 bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none font-black text-xs uppercase" />
+                      <button type="submit" className="bg-blue-600 px-8 rounded-2xl font-black uppercase text-[10px] hover:bg-blue-500 transition-all">Submit</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-2xl flex items-center gap-4 animate-in fade-in">
+                    <IconCheck className="text-emerald-500 w-6 h-6" />
+                    <p className="text-xs font-black uppercase text-emerald-500 tracking-tight">Payment Notice Sent! Waiting for verification.</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <button onClick={() => setCustomer(null)} className="w-full py-4 text-[9px] font-black text-slate-700 uppercase hover:text-slate-500 tracking-widest transition-all">Search Another Account</button>
           </div>
         )}
-      </div>
+      </main>
+
+      <footer className="mt-auto pt-12 text-[8px] text-slate-800 font-black uppercase tracking-[0.5em]">
+        Powered by SwifftNet Remote V3
+      </footer>
     </div>
   );
 }

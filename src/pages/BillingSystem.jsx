@@ -23,6 +23,8 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   // SETTINGS STATES
   const [paymentInfo, setPaymentInfo] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#10b981");
+  const [wispName, setWispName] = useState("");
+  const [wispLogo, setWispLogo] = useState("");
 
   // --- FEATURE: ACCESS SYNC ---
   const hasAccess = useMemo(() => {
@@ -52,6 +54,8 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
         if (sDoc.exists()) {
           setPaymentInfo(sDoc.data().paymentInstructions || "");
           setPrimaryColor(sDoc.data().primaryColor || "#10b981");
+          setWispName(sDoc.data().wispName || ""); // <--- ADD THIS
+          setWispLogo(sDoc.data().wispLogo || ""); // <--- ADD THIS
         }
     };
     fetchSettings();
@@ -118,6 +122,21 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     const script = `/ip firewall address-list add list=OVERDUE_LIST address=${client.ipAddress || "0.0.0.0"} comment="Overdue: ${client.name}"; /ppp secret disable [find name="${client.name}"]`;
     navigator.clipboard.writeText(script);
     alert(`Kill Script for ${client.name} Copied!`);
+  };
+
+  const saveBranding = async () => {
+    setLoading(true);
+    try {
+      const ref = doc(db, 'billing_systems', user.uid);
+      await setDoc(ref, { 
+        primaryColor, 
+        wispName, 
+        wispLogo, 
+        paymentInstructions: paymentInfo 
+      }, { merge: true });
+      alert("Portal Branding Updated Successfully!");
+    } catch (err) { alert(err.message); }
+    finally { setLoading(false); }
   };
 
   const saveCustomer = async (e) => {
@@ -299,6 +318,60 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
 
       {/* WISP SETTINGS & BRANDING */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-12">
+        <section className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-6">
+              <div>
+                <h3 className="text-xs font-black text-blue-500 uppercase italic">Public Portal Branding</h3>
+                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">This is what your customers will see.</p>
+              </div>
+              <input 
+                type="color" 
+                value={primaryColor} 
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="w-10 h-10 bg-transparent border-none cursor-pointer rounded-lg"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-[8px] text-slate-600 font-black uppercase ml-2">WISP Business Name</p>
+                <input 
+                  value={wispName} 
+                  onChange={e => setWispName(e.target.value.toUpperCase())} 
+                  className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-black text-xs text-white" 
+                  placeholder="E.G. KINGSLEY INTERNET"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-[8px] text-slate-600 font-black uppercase ml-2">Logo URL (Optional)</p>
+                <input 
+                  value={wispLogo} 
+                  onChange={e => setWispLogo(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-[10px] text-blue-400" 
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[8px] text-slate-600 font-black uppercase ml-2">Payment Instructions / GCash Details</p>
+              <textarea 
+                value={paymentInfo} 
+                onChange={e => setPaymentInfo(e.target.value)} 
+                className="bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-bold text-[10px] text-white w-full resize-none h-20" 
+                placeholder="Gcash: 0912... (Name)" 
+              />
+            </div>
+
+            <div className="flex gap-2">
+                <button onClick={saveBranding} disabled={loading} className="flex-1 bg-blue-600 py-5 rounded-3xl font-black uppercase text-[10px] shadow-xl hover:bg-blue-500 transition-all">
+                  {loading ? "SAVING..." : "Apply Changes to Portal"}
+                </button>
+                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/check-bill?id=${user.uid}`); alert("Portal Link Copied!"); }} className="bg-slate-800 p-5 rounded-3xl hover:bg-slate-700 transition-all">
+                  <IconCopy className="w-4 h-4" />
+                </button>
+            </div>
+        </section>
           <section className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6">
               <div className="flex justify-between items-center border-b border-slate-800 pb-6">
                 <div>
