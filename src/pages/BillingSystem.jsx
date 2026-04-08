@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
 import { collection, addDoc, query, onSnapshot, doc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, setDoc, getDoc, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { IconCard, IconHistory, IconCheck, IconSearch, IconCopy, IconEdit, IconDownload, IconShield } from '../components/Icons';
 
@@ -14,7 +14,14 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [paymentInfo, setPaymentInfo] = useState("");
 
-  const hasAccess = user.billingAccessUntil && user.billingAccessUntil.toDate() > new Date();
+  // --- FEATURE: BULLETPROOF ACCESS CHECK ---
+  // Gagamit tayo ng useMemo para mag-update agad ang UI kapag nag-avail si client
+  const hasAccess = useMemo(() => {
+    if (!user?.billingAccessUntil) return false;
+    // Check kung Firestore Timestamp o JS Date
+    const expiry = user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil);
+    return expiry > new Date();
+  }, [user?.billingAccessUntil]);
 
   // --- 1. MASTER LISTENERS ---
   useEffect(() => {
@@ -65,18 +72,15 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
         setLoading(true);
         try {
             const userRef = doc(db, 'users', user.uid); 
-
-            // --- ETO ANG NAWALA (Definition of expiryDate) ---
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 30);
 
-            // Gamit ang setDoc para siguradong gagawa ng doc kung wala pa
+            // Ginamitan ng setDoc + merge para iwas "No document to update" error
             await setDoc(userRef, { 
                 billingAccessUntil: expiryDate,
                 credits: Number(bal) - Number(dynamicPrice) 
             }, { merge: true });
 
-            // Transaction logging (ito yung record para sa admin)
             await addDoc(collection(db, 'artifacts', appId || 'swifftnet-remote-v3', 'public', 'data', 'payments'), {
                 email: user.email, 
                 amount: -dynamicPrice, 
