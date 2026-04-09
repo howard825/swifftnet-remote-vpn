@@ -157,9 +157,9 @@ export default function AdminPanel({
 
       // 2. I-update ang User document (Siguraduhin na 'users' ang collection name mo)
       // Dito natin ilalagay ang timestamp ng expiry
-      await updateDoc(doc(db, 'users', email), { 
-        billingAccessUntil: expiryDate 
-      });
+      await setDoc(doc(db, 'users', email), { 
+      billingAccessUntil: expiryDate 
+      }, { merge: true });
 
       // 3. Markahan ang request bilang 'assigned' para mawala sa pending
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { 
