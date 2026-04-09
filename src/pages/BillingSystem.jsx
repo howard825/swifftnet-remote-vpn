@@ -73,12 +73,24 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   }, [hasAccess, user.uid, db]);
 
   // --- 2. LOGIC ---
-  const getCustomerStatus = (client) => {
+    const getCustomerStatus = (client) => {
     const today = new Date();
     const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
+    const dueDate = Number(client.dueDate || 1);
+    const dayToday = today.getDate();
+
+    // 1. KUNG NAGBAYAD NA NGAYONG BUWAN
     if (client.lastPaidMonth === currentMonthYear) return 'paid';
-    if (today.getDate() > Number(client.dueDate)) return 'overdue';
-    return 'pending';
+
+    // 2. KUNG LUMAMPAS NA NG 5 DAYS SA DUE DATE (CUT/DISCONNECTED)
+    // Halimbawa: Due date is 15, ngayon ay 20 na.
+    if (dayToday > (dueDate + 5)) return 'cut';
+
+    // 3. KUNG LUMAMPAS NA SA DUE DATE PERO WALA PANG 5 DAYS (OVERDUE)
+    if (dayToday > dueDate) return 'overdue';
+
+    // 4. KUNG BAGO PA LANG ANG BUWAN AT HINDI PA DUE DATE (UNPAID/PENDING)
+    return 'pending'; 
   };
 
   const totalExpected = customers.reduce((sum, c) => sum + Number(c.monthlyFee), 0);
@@ -563,6 +575,13 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
         {filteredList.map(client => {
           const status = getCustomerStatus(client);
           const isSelected = selectedClients.includes(client.id);
+
+          const statusStyles = {
+              paid: 'border-emerald-500/20 text-emerald-500 bg-emerald-500/10',
+              overdue: 'border-orange-500/20 text-orange-500 bg-orange-500/10',
+              cut: 'border-red-500/40 text-red-500 bg-red-500/20 animate-pulse',
+              pending: 'border-slate-800 text-slate-400 bg-slate-900/50'
+            };
           return (
             <div key={client.id} className={`bg-slate-900 p-8 rounded-[45px] border flex flex-col justify-between transition-all group ${status === 'paid' ? 'border-emerald-500/20 shadow-lg' : status === 'overdue' ? 'border-red-500/20' : 'border-slate-800'}`}>
                 <div className="absolute top-6 left-6 z-10">
