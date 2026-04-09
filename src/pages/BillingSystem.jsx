@@ -19,6 +19,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  onst [selectedClients, setSelectedClients] = useState([]);
   
   
   // SETTINGS STATES
@@ -124,6 +125,45 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     }
   };
 
+  // --- BULK ACTION HANDLERS ---
+  
+  const toggleSelect = (id) => {
+    setSelectedClients(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedClients.length === filteredList.length) {
+      setSelectedClients([]);
+    } else {
+      setSelectedClients(filteredList.map(c => c.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedClients.length === 0) return;
+    
+    if (window.confirm(`⚠️ WARNING: Delete ${selectedClients.length} selected clients? This cannot be undone!`)) {
+      setLoading(true);
+      try {
+        const batch = writeBatch(db);
+        selectedClients.forEach(id => {
+          const docRef = doc(db, 'billing_systems', user.uid, 'customers', id);
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        setSelectedClients([]);
+        alert("Bulk Deletion Successful!");
+      } catch (err) {
+        alert("Delete Error: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const updateBranding = async (color) => {
     try {
       setPrimaryColor(color);
@@ -183,32 +223,45 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     reader.onload = async (evt) => {
       try {
         setLoading(true);
-        const { read, utils } = await import('xlsx'); // Dynamic import
+        const { read, utils } = await import('xlsx');
         const wb = read(evt.target.result, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
+        const ws = wb.Sheets[wb.SheetNames[0]];
         const data = utils.sheet_to_json(ws);
 
-        // Ang Excel columns ay dapat: Name, Plan, Price, DueDate, DateInstalled, InstallBal
+        const today = new Date();
+        const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
+
         for (const row of data) {
+          // --- SMART MAPPING: Hinahanap natin yung data kahit ano pang header name ang gamit ---
+          const name = row['FULL NAME'] || row['Name'] || row['NAME'] || "UNKNOWN";
+          const planName = row['PLAN NAME'] || row['Plan'] || row['PLAN'] || "N/A";
+          const planPrice = Number(row['PLAN PRICE'] || row['Price'] || row['PRICE'] || 0);
+          const dueDate = String(row['DUE DATE'] || row['DueDate'] || row['DUE'] || 1);
+          const dateInstalled = row['DATE INSTALLED'] || row['Date'] || "";
+          const installBal = Number(row['INSTALLATION BALANCE'] || row['InstallBal'] || 0);
+          const remarks = (row['REMARKS'] || row['Status'] || "").toLowerCase();
+
           await addDoc(collection(db, 'billing_systems', user.uid, 'customers'), {
-            name: (row.Name || "UNKNOWN").toUpperCase(),
-            planName: (row.Plan || "N/A").toUpperCase(),
-            monthlyFee: Number(row.Price || 0),
-            dueDate: String(row.DueDate || 1),
-            dateInstalled: row.DateInstalled || "",
-            installationBalance: Number(row.InstallBal || 0),
-            lastPaidMonth: "",
-            history: [],
+            name: name.toUpperCase(),
+            planName: planName.toUpperCase(),
+            monthlyFee: planPrice,
+            dueDate: dueDate,
+            dateInstalled: dateInstalled,
+            installationBalance: installBal,
+            // Kung ang remarks sa excel ay "Paid", i-set natin na paid na siya ngayong buwan
+            lastPaidMonth: remarks.includes('paid') ? currentMonthYear : "",
+            history: remarks.includes('paid') ? [{ date: today.toLocaleDateString(), amount: planPrice, type: 'Imported Payment' }] : [],
             createdAt: serverTimestamp()
           });
         }
-        alert(`Import Success! ${data.length} clients added.`);
+
+        alert(`🚀 Import Success! ${data.length} clients added to Swifftnet database.`);
         setShowAddModal(false);
       } catch (err) {
         alert("Excel Error: " + err.message);
       } finally {
         setLoading(false);
+        e.target.value = null; // Reset input
       }
     };
     reader.readAsBinaryString(file);
@@ -464,25 +517,62 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
       </div>
 
       {/* FILTER & SEARCH */}
-      <div className="bg-slate-900/50 p-6 rounded-[45px] border border-slate-800 mb-8 flex flex-col md:flex-row gap-6">
-        <div className="flex-1 flex items-center bg-slate-950 rounded-3xl px-6 border border-slate-800 group focus-within:border-blue-500 transition-all">
-          <IconSearch className="text-slate-700 w-5 h-5 group-focus-within:text-blue-500" />
-          <input className="w-full bg-transparent p-5 outline-none text-sm font-black uppercase placeholder:text-slate-800 text-white" placeholder="Search customer or IP address..." onChange={(e) => setSearchTerm(e.target.value)} />
+      {/* FILTER & SEARCH */}
+      <div className="bg-slate-900/50 p-6 rounded-[45px] border border-slate-800 mb-8 space-y-4">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1 flex items-center bg-slate-950 rounded-3xl px-6 border border-slate-800 group focus-within:border-blue-500 transition-all">
+            <IconSearch className="text-slate-700 w-5 h-5 group-focus-within:text-blue-500" />
+            <input className="w-full bg-transparent p-5 outline-none text-sm font-black uppercase placeholder:text-slate-800 text-white" placeholder="Search customer or IP address..." onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          
+          <div className="flex gap-2">
+            <select className="bg-slate-950 border border-slate-800 px-8 rounded-3xl text-[10px] font-black uppercase outline-none text-blue-500 cursor-pointer" onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="all">Status: All</option>
+                <option value="paid">✅ Fully Paid</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="overdue">🚨 Overdue</option>
+            </select>
+          </div>
         </div>
-        <select className="bg-slate-950 border border-slate-800 px-8 rounded-3xl text-[10px] font-black uppercase outline-none text-blue-500 cursor-pointer" onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">Status: All</option>
-            <option value="paid">✅ Fully Paid</option>
-            <option value="pending">⏳ Pending</option>
-            <option value="overdue">🚨 Overdue</option>
-        </select>
+
+        {/* --- BULK ACTION BAR --- */}
+        <div className="flex justify-between items-center px-4 pt-2 border-t border-slate-800/50">
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500"
+              checked={selectedClients.length === filteredList.length && filteredList.length > 0}
+              onChange={toggleSelectAll}
+            />
+            <span className="text-[10px] font-black uppercase text-slate-500">Select All Clients</span>
+          </div>
+
+          {selectedClients.length > 0 && (
+            <button 
+              onClick={handleBulkDelete}
+              className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase transition-all flex items-center gap-2 animate-in zoom-in"
+            >
+              🗑️ Delete Selected ({selectedClients.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {/* CUSTOMER GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredList.map(client => {
           const status = getCustomerStatus(client);
+          const isSelected = selectedClients.includes(client.id);
           return (
             <div key={client.id} className={`bg-slate-900 p-8 rounded-[45px] border flex flex-col justify-between transition-all group ${status === 'paid' ? 'border-emerald-500/20 shadow-lg' : status === 'overdue' ? 'border-red-500/20' : 'border-slate-800'}`}>
+                <div className="absolute top-6 left-6 z-10">
+                  <input 
+                    type="checkbox" 
+                    checked={isSelected}
+                    onChange={() => toggleSelect(client.id)}
+                    className="w-5 h-5 rounded-lg border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
               <div className="flex justify-between items-start mb-8">
                   <div className="flex gap-4 items-center">
                     <div onDoubleClick={() => { if(window.confirm(`Delete ${client.name}?`)) deleteDoc(doc(db, 'billing_systems', user.uid, 'customers', client.id)) }} className={`w-14 h-14 rounded-[22px] flex items-center justify-center font-black text-2xl uppercase shadow-xl transition-all ${status === 'paid' ? 'bg-emerald-600 text-white' : status === 'overdue' ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-950 border border-slate-800 text-slate-600'}`}>
