@@ -131,6 +131,32 @@ export default function ClientDashboard({
     } catch (err) { alert(err.message); }
   };
 
+  // I-paste mo rito sa pagitan nila
+  const handleAvailBilling = async () => {
+    const licensePrice = Number(prices?.billing_system_license || 150);
+    const currentBal = Number(bal);
+
+    if (currentBal < licensePrice) {
+      return alert(`Insufficient balance! Needs ₱${licensePrice}`);
+    }
+
+    try {
+      await addDoc(collection(db, ...base, 'requests'), {
+        email: user.email,
+        status: 'pending',
+        type: 'billing_license',
+        category: 'license',
+        pricePaid: licensePrice,
+        note: "WISP Billing System Activation",
+        date: serverTimestamp()
+      });
+      alert("Billing License Request Sent! Admin will activate it shortly. 🚀");
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+  };
+// Dito nag-uumpisa yung susunod mong function (submitDeposit)
+
   const submitDeposit = async (e) => {
     e.preventDefault();
     const amount = e.target.amount.value;
@@ -243,12 +269,21 @@ export default function ClientDashboard({
                   </p>
               </div>
               <button 
-                onClick={() => navigate('/billing')} 
+                onClick={() => {
+                  // Check access logic
+                  const hasAccess = user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date();
+                  
+                  if (hasAccess) {
+                    navigate('/billing'); // Kung paid na, diretso sa billing dashboard
+                  } else {
+                    handleAvailBilling(); // Kung hindi pa, trigger ang payment request
+                  }
+                }} 
                 className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest shadow-xl transition-all"
               >
                 {user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date() 
                   ? "Open Dashboard" 
-                  : "Avail License"}
+                  : `Avail License (₱${prices?.billing_system_license || 150})`}
               </button>
           </div>
 

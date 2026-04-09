@@ -146,6 +146,35 @@ export default function AdminPanel({
     }
   };
 
+  const activateBillingLicense = async (reqId, email) => {
+    try {
+      // 1. Hanapin ang user base sa email para makuha ang UID nila
+      // Note: Kung may userId field ka na sa request document, mas mabilis.
+      // Pero as of now, i-update natin ang access setting.
+      
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30); // 30 Days Access
+
+      // 2. I-update ang User document (Siguraduhin na 'users' ang collection name mo)
+      // Dito natin ilalagay ang timestamp ng expiry
+      await updateDoc(doc(db, 'users', email), { 
+        billingAccessUntil: expiryDate 
+      });
+
+      // 3. Markahan ang request bilang 'assigned' para mawala sa pending
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', reqId), { 
+        status: 'assigned' 
+      });
+
+      // 4. Notify client via email
+      sendEmail(email, "Billing License Activated! 💳", "Your ISP Billing System is now active for 30 days. You can now access your billing dashboard.");
+      
+      alert(`License activated for ${email}!`);
+    } catch (err) {
+      alert("Activation Error: " + err.message);
+    }
+  };
+
   // 3. Pag-reply ng Admin sa Support Ticket
   const handleAdminReply = async (e) => {
     e.preventDefault();
@@ -288,68 +317,96 @@ export default function AdminPanel({
               {requests.filter(r => r.status === 'pending').length === 0 && (
                 <p className="text-[11px] text-slate-600 uppercase font-black italic text-center col-span-2 py-10">No pending requests.</p>
               )}
+              
               {requests.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className="bg-slate-900 p-12 rounded-[60px] border border-slate-800 shadow-2xl space-y-8 animate-in slide-in-from-left-4 relative">
+                <div key={r.id} className="bg-slate-900 p-12 rounded-[60px] border border-slate-800 shadow-2xl space-y-8 animate-in slide-in-from-left-4 relative overflow-hidden">
                   
-                  {/* --- PROTOCOL & TYPE BADGES --- */}
+                  {/* --- DYNAMIC BADGES --- */}
                   <div className="absolute top-8 right-8 flex flex-col items-end gap-2">
-                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${r.type === 'trial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' : 'bg-blue-500/10 text-blue-500 border-blue-500/30'}`}>
-                      {(r.type || 'new').toUpperCase()} REQUEST
+                    {/* Main Request Type Badge */}
+                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${
+                      r.type === 'trial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' : 
+                      r.type === 'billing_license' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 
+                      'bg-blue-500/10 text-blue-500 border-blue-500/30'
+                    }`}>
+                      {(r.type || 'new').replace('_', ' ').toUpperCase()} REQUEST
                     </span>
                     
-                    {/* ETO ANG DINAGDAG: PROTOCOL INDICATOR */}
-                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border shadow-lg ${r.protocol === 'sstp' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-blue-600 text-white border-blue-400'}`}>
-                      PREFERENCE: {r.protocol || 'L2TP'}
-                    </span>
+                    {/* Protocol Indicator - Lalabas lang kung VPN/Internet request, hindi sa License */}
+                    {r.type !== 'billing_license' && (
+                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border shadow-lg ${r.protocol === 'sstp' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-blue-600 text-white border-blue-400'}`}>
+                        PREFERENCE: {r.protocol?.toUpperCase() || 'L2TP'}
+                      </span>
+                    )}
                   </div>
 
                   <p className="font-black text-white text-lg truncate uppercase border-b border-slate-800 pb-6 pr-40">{r.email}</p>
-                  
-                  {/* Admin Assignment Form */}
-                  <form onSubmit={(e) => { 
-                    e.preventDefault(); 
-                    const fd = new FormData(e.target); 
-                    adminAssignTunnel(r.id, r.email, { 
-                      days: fd.get('d'), 
-                      u: fd.get('u'),    
-                      p: fd.get('p'),    
-                      port: fd.get('port'), 
-                      portAux: fd.get('portAux'), 
-                      webPort: fd.get('webPort'), 
-                      service: r.service || 'winbox' 
-                    }, r.type, r.vpnId, r.category); 
-                  }} className="space-y-6">
-                    
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Subscription Days</label>
-                      <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : (r.category === 'internet' ? "30" : "365")} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500" />
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <input name="u" placeholder="Generate VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
-                      <input name="p" placeholder="Generate VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
-                    </div>
-                    
-                    {/* Port Assignments */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-[7px] text-slate-700 font-black uppercase text-center">Winbox</p>
-                        <input name="port" placeholder="Port 1" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
+                  {/* --- CONDITIONAL CONTENT: LICENSE VS VPN --- */}
+                  {r.type === 'billing_license' ? (
+                    <div className="space-y-6 animate-in zoom-in-95 pt-4">
+                      <div className="bg-emerald-600/5 p-8 rounded-[2.5rem] border border-emerald-500/10 text-center">
+                        <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <IconCard className="w-8 h-8 text-emerald-500" />
+                        </div>
+                        <h3 className="text-xl font-black uppercase text-white tracking-tighter">Billing License Activation</h3>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-2 tracking-widest italic">Wallet Verification: ₱150 PAID</p>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-[7px] text-slate-700 font-black uppercase text-center">SSH/API</p>
-                        <input name="portAux" placeholder="Port 2" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[7px] text-orange-600 font-black uppercase text-center">Silent Port</p>
-                        <input name="webPort" placeholder="Web" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-orange-500 outline-none border border-slate-800 focus:border-orange-500" />
-                      </div>
-                    </div>
 
-                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3">
-                      <IconShield /> AUTHORIZE & DEPLOY NODE
-                    </button>
-                  </form>
+                      <button 
+                        onClick={() => activateBillingLicense(r.id, r.email)}
+                        className="w-full bg-emerald-600 py-6 rounded-3xl font-black uppercase text-xs shadow-[0_0_25px_rgba(16,185,129,0.2)] hover:bg-emerald-500 transition-all flex items-center justify-center gap-3"
+                      >
+                        <IconCheck className="w-4 h-4" /> ACTIVATE 30-DAY LICENSE
+                      </button>
+                    </div>
+                  ) : (
+                    /* VPN / Remote Access Assignment Form */
+                    <form onSubmit={(e) => { 
+                      e.preventDefault(); 
+                      const fd = new FormData(e.target); 
+                      adminAssignTunnel(r.id, r.email, { 
+                        days: fd.get('d'), 
+                        u: fd.get('u'),    
+                        p: fd.get('p'),    
+                        port: fd.get('port'), 
+                        portAux: fd.get('portAux'), 
+                        webPort: fd.get('webPort'), 
+                        service: r.service || 'winbox' 
+                      }, r.type, r.vpnId, r.category); 
+                    }} className="space-y-6">
+                      
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-600 uppercase ml-4">Subscription Days</label>
+                        <input name="d" type="number" defaultValue={r.type === 'trial' ? "1" : (r.category === 'internet' ? "30" : "365")} className="w-full bg-slate-950 p-5 rounded-2xl text-center font-black border border-slate-800 outline-none text-emerald-500 focus:border-emerald-500" />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <input name="u" placeholder="Generate VPN User" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
+                        <input name="p" placeholder="Generate VPN Pass" required className="bg-slate-950 p-5 rounded-2xl font-black w-full border border-slate-800 outline-none focus:border-blue-500" />
+                      </div>
+                      
+                      {/* Port Assignments (Triple Grid) */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-[7px] text-slate-700 font-black uppercase text-center">Winbox</p>
+                          <input name="port" placeholder="Port 1" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-emerald-400 outline-none border border-slate-800 focus:border-emerald-500" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[7px] text-slate-700 font-black uppercase text-center">SSH/API</p>
+                          <input name="portAux" placeholder="Port 2" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-blue-400 outline-none border border-slate-800 focus:border-blue-500" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[7px] text-orange-600 font-black uppercase text-center">Silent Port</p>
+                          <input name="webPort" placeholder="Web" required className="bg-slate-950 p-5 rounded-2xl font-black w-full text-center text-orange-500 outline-none border border-slate-800 focus:border-orange-500" />
+                        </div>
+                      </div>
+
+                      <button className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3">
+                        <IconShield /> AUTHORIZE & DEPLOY NODE
+                      </button>
+                    </form>
+                  )}
                 </div>
               ))}
             </div>
