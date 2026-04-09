@@ -160,20 +160,58 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     try {
       await addDoc(collection(db, 'billing_systems', user.uid, 'customers'), {
         name: fd.get('customerName').toUpperCase(),
-        monthlyFee: Number(fd.get('monthlyFee')),
+        planName: fd.get('planName').toUpperCase(),
+        monthlyFee: Number(fd.get('planPrice')), // Kinonek natin sa fee para hindi masira ang analytics
         dueDate: fd.get('dueDate'),
-        ipAddress: fd.get('ipAddress') || "DHCP",
-        napBox: fd.get('napBox') || "N/A",
-        napPort: fd.get('napPort') || "N/A",
-        mapsLink: fd.get('mapsLink') || "",
+        dateInstalled: fd.get('dateInstalled'),
+        installationBalance: Number(fd.get('installBal')),
         lastPaidMonth: "",
         history: [],
         createdAt: serverTimestamp()
       });
       setShowAddModal(false);
-      alert("Customer & Inventory Added!");
+      alert("Client Record Created!");
     } catch (err) { alert(err.message); }
     finally { setLoading(false); }
+  };
+
+  const handleExcelImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        setLoading(true);
+        const { read, utils } = await import('xlsx'); // Dynamic import
+        const wb = read(evt.target.result, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = utils.sheet_to_json(ws);
+
+        // Ang Excel columns ay dapat: Name, Plan, Price, DueDate, DateInstalled, InstallBal
+        for (const row of data) {
+          await addDoc(collection(db, 'billing_systems', user.uid, 'customers'), {
+            name: (row.Name || "UNKNOWN").toUpperCase(),
+            planName: (row.Plan || "N/A").toUpperCase(),
+            monthlyFee: Number(row.Price || 0),
+            dueDate: String(row.DueDate || 1),
+            dateInstalled: row.DateInstalled || "",
+            installationBalance: Number(row.InstallBal || 0),
+            lastPaidMonth: "",
+            history: [],
+            createdAt: serverTimestamp()
+          });
+        }
+        alert(`Import Success! ${data.length} clients added.`);
+        setShowAddModal(false);
+      } catch (err) {
+        alert("Excel Error: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleUpdateCustomer = async (e) => {
@@ -484,28 +522,80 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
       {/* ADD MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 z-[200]">
-          <div className="bg-slate-900 w-full max-w-md p-10 rounded-[60px] border border-slate-800 shadow-2xl space-y-8">
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter text-blue-500">Create Node</h2>
-            <form onSubmit={saveCustomer} className="space-y-4">
-              <input name="customerName" required placeholder="FULL NAME" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm uppercase text-white focus:border-blue-500" />
-              <div className="grid grid-cols-2 gap-4">
-                <input name="monthlyFee" type="number" required defaultValue="500" placeholder="FEE" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm text-white" />
-                <input name="dueDate" type="number" required defaultValue="1" placeholder="DUE DAY" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm text-white" />
+          <div className="bg-slate-900 w-full max-w-2xl p-10 rounded-[60px] border border-slate-800 shadow-2xl space-y-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            
+            {/* HEADER WITH EXCEL IMPORT */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+              <div>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter text-blue-500">New Client Entry</h2>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Billing & Network Inventory</p>
               </div>
               
-              <div className="p-5 bg-black/20 rounded-3xl space-y-4 border border-slate-800/50">
-                <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-1">Network Inventory</p>
-                <input name="ipAddress" placeholder="ASSIGNED IP" className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs text-blue-400" />
-                <div className="grid grid-cols-2 gap-2">
-                  <input name="napBox" placeholder="NAP BOX #" className="bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs" />
-                  <input name="napPort" placeholder="PORT #" className="bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs" />
+              <label className="bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 px-6 py-3 rounded-2xl text-[9px] font-black uppercase cursor-pointer hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2">
+                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExcelImport} />
+                <IconDownload className="w-3 h-3" /> Bulk Import (Excel)
+              </label>
+            </div>
+
+            <form onSubmit={saveCustomer} className="space-y-6">
+              {/* --- SECTION 1: PERSONAL & PLAN INFO --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-[8px] text-slate-600 font-black uppercase ml-4 mb-2 block">Full Name</label>
+                  <input name="customerName" required placeholder="JUAN DELA CRUZ" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm uppercase text-white focus:border-blue-500" />
                 </div>
-                <input name="mapsLink" placeholder="GOOGLE MAPS LINK (OPTIONAL)" className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-[9px]" />
+
+                <div>
+                  <label className="text-[8px] text-slate-600 font-black uppercase ml-4 mb-2 block">Plan Name</label>
+                  <input name="planName" required placeholder="E.G. PLAN 1500" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-xs text-white uppercase" />
+                </div>
+
+                <div>
+                  <label className="text-[8px] text-slate-600 font-black uppercase ml-4 mb-2 block">Plan Price / Monthly Fee</label>
+                  <input name="monthlyFee" type="number" required defaultValue="500" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm text-white" />
+                </div>
               </div>
 
+              {/* --- SECTION 2: DATES & BALANCES --- */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[8px] text-slate-600 font-black uppercase ml-4 mb-2 block">Due Day</label>
+                  <input name="dueDate" type="number" required defaultValue="1" className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-sm text-white text-center" />
+                </div>
+                <div>
+                  <label className="text-[8px] text-slate-600 font-black uppercase ml-4 mb-2 block">Date Installed</label>
+                  <input name="dateInstalled" type="date" required className="w-full bg-slate-950 border border-slate-800 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase" />
+                </div>
+                <div>
+                  <label className="text-[8px] text-orange-600 font-black uppercase ml-4 mb-2 block">Install Balance</label>
+                  <input name="installBal" type="number" defaultValue="0" className="w-full bg-slate-950 border border-orange-500/30 p-5 rounded-3xl outline-none font-black text-sm text-orange-500 text-center" />
+                </div>
+              </div>
+
+              {/* --- SECTION 3: NETWORK INVENTORY (ORIGINAL) --- */}
+              <div className="p-6 bg-black/20 rounded-[40px] space-y-4 border border-slate-800/50">
+                <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] ml-1 mb-4 flex items-center gap-2">
+                  <IconShield className="w-3 h-3" /> Network Inventory
+                </p>
+                
+                <div className="space-y-4">
+                  <input name="ipAddress" placeholder="ASSIGNED IP ADDRESS" className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs text-blue-400" />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <input name="napBox" placeholder="NAP BOX #" className="bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs text-white" />
+                    <input name="napPort" placeholder="PORT #" className="bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-xs text-white" />
+                  </div>
+                  
+                  <input name="mapsLink" placeholder="GOOGLE MAPS LINK (OPTIONAL)" className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl outline-none font-bold text-[9px] text-slate-500" />
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
               <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 font-black uppercase text-[10px] text-slate-600">CANCEL</button>
-                  <button type="submit" disabled={loading} className="flex-[2] bg-blue-600 py-5 rounded-3xl font-black uppercase text-xs shadow-xl">{loading ? 'CREATING...' : 'ADD CUSTOMER'}</button>
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 font-black uppercase text-[10px] text-slate-600 hover:text-white transition-colors tracking-widest">CANCEL</button>
+                <button type="submit" disabled={loading} className="flex-[2] bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-[0_0_30px_rgba(37,99,235,0.2)] hover:bg-blue-500 transition-all">
+                  {loading ? 'SYNCING DATABASE...' : 'AUTHORIZE & SAVE CLIENT'}
+                </button>
               </div>
             </form>
           </div>
