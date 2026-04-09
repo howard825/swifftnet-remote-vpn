@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import NetworkToolbox from '../components/NetworkToolbox';
 import NetworkUtils from '../components/NetworkUtils';
@@ -55,7 +55,7 @@ export default function ClientDashboard({
   useEffect(() => {
     if (!user?.email) return;
     
-    const { onSnapshot, doc } = require('firebase/firestore'); // Siguraduhing imported ito o gamitin ang existing
+     // Siguraduhing imported ito o gamitin ang existing
     const userRef = doc(db, 'users', user.email);
     
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
