@@ -84,6 +84,52 @@ export default function ClientDashboard({
     }
   };
 
+    const handleRenewVpn = async (asgn) => {
+    // 1. Tukuyin ang presyo base sa category (Remote vs Internet)
+    const renewPrice = asgn.category === 'internet' ? prices.internetVpnPrice : prices.vpnPrice;
+    
+    if (bal < renewPrice) {
+      return alert(`Insufficient balance to renew! You need ₱${renewPrice}`);
+    }
+
+    if (window.confirm(`Renew this node for ₱${renewPrice}? This will auto-deduct from your balance.`)) {
+      try {
+        // A. Kalkulahin ang bagong expiry (Current Expiry + 30 days o 365 days)
+        const currentExpiry = new Date(asgn.expiry);
+        const newExpiry = new Date(currentExpiry > new Date() ? currentExpiry : new Date());
+        
+        if (asgn.category === 'internet') {
+          newExpiry.setDate(newExpiry.getDate() + 30);
+        } else {
+          newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+        }
+
+        // B. I-update ang Assignment document (Auto-extend)
+        const asgnRef = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
+        await updateDoc(asgnRef, { 
+          expiry: newExpiry.toISOString(),
+          status: 'active' 
+        });
+
+        // C. MAG-CREATE NG REQUEST (Para ma-deduct sa calculated balance)
+        await addDoc(collection(db, ...base, 'requests'), {
+          email: user.email,
+          status: 'assigned', // Auto-assigned para hindi na dadaan sa Admin
+          type: 'renewal',
+          category: asgn.category,
+          vpnId: asgn.id,
+          pricePaid: renewPrice,
+          note: `Auto-Renewal: ${asgn.nickname || asgn.user}`,
+          date: serverTimestamp()
+        });
+
+        alert("Node Renewed Successfully! 🚀");
+      } catch (err) {
+        alert("Renewal Error: " + err.message);
+      }
+    }
+  };
+
   const handleVpnRequest = async (type = 'new', vpnId = null) => {
     if (bal < currentPrice) return alert("Insufficient balance.");
 
@@ -344,11 +390,11 @@ export default function ClientDashboard({
                 const isExpired = new Date() > new Date(asgn.expiry);
 
                 const script = (() => {
-                    const protocol = asgn.protocol || 'l2tp';
+                    const protocol = asgn.protocol || 'sstp';
                     const isInternet = asgn.category === 'internet';
                     const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
 
-                    let baseScript = protocol === 'l2tp' 
+                    let baseScript = protocol === 'sstp' 
                     ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
                     : `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
 
@@ -431,6 +477,7 @@ export default function ClientDashboard({
 
                     {/* DEPLOYMENT STATUS BUTTON & EXPIRY PROGRESS */}
                     <div className="pt-4 space-y-4">
+                      {/* PROGRESS BAR: Wag mong hayaang maging empty ito */}
                       <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800/50 shadow-inner">
                         <div 
                           className={`h-full transition-all duration-1000 ${isExpired ? 'bg-red-500' : 'bg-blue-500 shadow-[0_0_10px_#3b82f6]'}`} 
@@ -438,13 +485,23 @@ export default function ClientDashboard({
                         />
                       </div>
                       
+                      {/* STATUS BUTTONS */}
                       {asgn.status !== 'active' ? (
                         <button disabled className="w-full bg-slate-800 py-4 rounded-2xl font-black uppercase text-[10px] text-slate-600 italic animate-pulse tracking-widest border border-slate-700">
                           Deploying Remote Environment...
                         </button>
+                      ) : isExpired ? (
+                        /* AUTO-RENEWAL BUTTON */
+                        <button 
+                          onClick={() => handleRenewVpn(asgn)}
+                          className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-[0_0_20px_rgba(234,88,12,0.3)] transition-all animate-bounce"
+                        >
+                          🚨 Expired: Renew Now (₱{asgn.category === 'internet' ? prices.internetVpnPrice : prices.vpnPrice})
+                        </button>
                       ) : (
+                        /* ACTIVE STATUS */
                         <button className="w-full bg-blue-600/10 text-blue-500 border border-blue-500/20 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-blue-600 hover:text-white transition-all">
-                          Finished Deployment Successfully
+                          Subscription Active
                         </button>
                       )}
                     </div>
