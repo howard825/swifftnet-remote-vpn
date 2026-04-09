@@ -19,6 +19,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [liveUser, setLiveUser] = useState(user); // Idagdag ito
   
   // SETTINGS STATES
   const [paymentInfo, setPaymentInfo] = useState("");
@@ -28,10 +29,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
 
   // --- FEATURE: ACCESS SYNC ---
   const hasAccess = useMemo(() => {
-    if (!user?.billingAccessUntil) return false;
-    const expiry = user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil);
+    if (!liveUser?.billingAccessUntil) return false;
+    const expiry = liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil);
     return expiry > new Date();
-  }, [user?.billingAccessUntil]);
+  }, [liveUser?.billingAccessUntil]);
 
   // --- 1. MASTER LISTENERS ---
   useEffect(() => {
@@ -48,6 +49,15 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     const unsubCollections = onSnapshot(query(collection(db, 'billing_systems', user.uid, 'collections'), orderBy('timestamp', 'desc'), limit(50)), (snap) => {
         setCollections(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+
+    // PROFILE LISTENER (Para sa Activation & Balance Sync)
+    const userRef = doc(db, 'users', user.email); // Ginagamit ang EMAIL bilang ID
+    const unsubProfile = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) setLiveUser({ ...user, ...snap.data() });
+    });
+
+    // Isama sa return para mag-unsubscribe
+    return () => { unsubCustomers(); unsubNotices(); unsubCollections(); unsubProfile(); };
 
     const fetchSettings = async () => {
         const sDoc = await getDoc(doc(db, 'billing_systems', user.uid));
@@ -80,27 +90,32 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   // --- 3. CORE HANDLERS ---
 
   const handleUnlock = async () => {
-    const dynamicPrice = prices?.billing_system_license || base?.billing_system_license || 150; 
-    if (bal < dynamicPrice) return alert(`Insufficient balance! Needs ₱${dynamicPrice}`);
+    const dynamicPrice = Number(prices?.billing_system_license || 150); 
+    const currentBal = Number(bal); // Siguraduhin na number ang balance
+
+    if (currentBal < dynamicPrice) return alert(`Insufficient balance! Needs ₱${dynamicPrice}`);
 
     if (window.confirm(`Deduct ₱${dynamicPrice} from credits to unlock Billing for 30 days?`)) {
         setLoading(true);
         try {
-            const userRef = doc(db, 'users', user.uid); 
+            // FIX: Gamitin ang user.email bilang ID ng document
+            const userRef = doc(db, 'users', user.email); 
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 30);
 
             await setDoc(userRef, { 
                 billingAccessUntil: expiryDate,
-                credits: Number(bal) - Number(dynamicPrice) 
+                // Optional: Kung gusto mo ring bawasan ang static credit field
+                credits: Number(currentBal) - Number(dynamicPrice) 
             }, { merge: true });
 
-            await addDoc(collection(db, 'artifacts', appId || 'swifftnet-remote-v3', 'public', 'data', 'payments'), {
+            // Mag-record ng payment request para ma-track sa history
+            await addDoc(collection(db, 'artifacts', appId || 'swifftnet-remote-v3', 'public', 'data', 'requests'), {
                 email: user.email, 
-                amount: -dynamicPrice, 
-                status: 'confirmed', 
+                pricePaid: dynamicPrice, 
+                status: 'assigned', // Auto-approved dahil nag-deduct na tayo
                 type: 'billing_license', 
-                refNo: `BILL-${Math.random().toString(36).toUpperCase().slice(2,8)}`, 
+                category: 'license',
                 date: serverTimestamp()
             });
 
