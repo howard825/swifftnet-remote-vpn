@@ -78,6 +78,7 @@ export default function Home() {
       <footer className="py-20 border-t border-slate-900 bg-slate-950 text-center space-y-8">
         <div className="flex flex-wrap justify-center gap-8 md:gap-12">
           <Link to="/" className="text-[10px] font-black uppercase text-white tracking-widest">Home</Link>
+          <Link to="/status" className="px-6 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>Server Status</Link>
           <Link to="/login" className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest transition-colors">Client Portal</Link>
           <Link to="/privacy-policy" className="text-[10px] font-black uppercase text-blue-500 hover:underline tracking-widest transition-colors">Privacy Policy</Link>
           <Link to="/terms-of-use" className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest transition-colors">Terms of Service</Link>
