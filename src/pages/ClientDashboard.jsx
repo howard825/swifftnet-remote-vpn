@@ -42,7 +42,7 @@ export default function ClientDashboard({
   // --- INTERNAL UI STATES ---
   const [serviceCategory, setServiceCategory] = useState("remote"); // remote or internet
   const [requestService, setRequestService] = useState("winbox");
-  const [vpnProtocol, setVpnProtocol] = useState("l2tp");
+  const [vpnProtocol, setVpnProtocol] = useState("sstp");
   const [promoInput, setPromoInput] = useState("");
   const [isPromoValid, setIsPromoValid] = useState(false);
   const [clientNote, setClientNote] = useState("");
