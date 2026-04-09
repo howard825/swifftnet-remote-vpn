@@ -19,7 +19,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [liveUser, setLiveUser] = useState(user); // Idagdag ito
+  
   
   // SETTINGS STATES
   const [paymentInfo, setPaymentInfo] = useState("");
@@ -29,10 +29,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
 
   // --- FEATURE: ACCESS SYNC ---
   const hasAccess = useMemo(() => {
-    if (!liveUser?.billingAccessUntil) return false;
+    if (!user?.billingAccessUntil) return false;
     const expiry = liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil);
     return expiry > new Date();
-  }, [liveUser?.billingAccessUntil]);
+  }, [user?.billingAccessUntil]);
 
   // --- 1. MASTER LISTENERS ---
   useEffect(() => {
@@ -92,6 +92,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const handleUnlock = async () => {
     const dynamicPrice = Number(prices?.billing_system_license || 150); 
     const currentBal = Number(bal); // Siguraduhin na number ang balance
+    const currentBal = Number(user?.credits || 0);
 
     if (currentBal < dynamicPrice) return alert(`Insufficient balance! Needs ₱${dynamicPrice}`);
 

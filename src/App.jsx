@@ -51,7 +51,7 @@ export default function App() {
     const unsubAuth = onAuthStateChanged(auth, (fUser) => {
       if (fUser) {
         // Makikinig tayo sa document ng user sa Firestore para mag-sync agad ang credits at billing status
-        unsubProfile = onSnapshot(doc(db, 'users', fUser.uid), (snap) => {
+        unsubProfile = onSnapshot(doc(db, 'users', fUser.email), (snap) => {
           const role = fUser.email === ADMIN_EMAIL ? 'admin' : 'client';
           const firestoreData = snap.exists() ? snap.data() : {};
           
@@ -117,10 +117,20 @@ export default function App() {
 
   if (!isAuthReady) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-mono animate-pulse uppercase">SwifftNet V3 Starting...</div>;
 
+  const totalDeposits = payments
+  .filter(p => p.status === 'confirmed')
+  .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const totalSpent = requests
+    .filter(r => r.type !== 'trial' && r.status !== 'denied')
+    .reduce((sum, r) => sum + (Number(r.pricePaid) || Number(prices.vpnPrice)), 0);
+
+  const calculatedBal = totalDeposits - totalSpent;
+
   const commonProps = {
     user, db, base, appId: "swifftnet-remote-v3", ADMIN_EMAIL,
     payments, requests, assignments, tickets, promos, prices,
-    bal: user?.credits || 0, // <--- Prop para sa Billing System balance sync
+    bal: callculatedBal, // <--- Prop para sa Billing System balance sync
     sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody, announcement, setAnnouncement, maint, setMaint
   };
 

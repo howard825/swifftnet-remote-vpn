@@ -48,7 +48,7 @@ export default function ClientDashboard({
   const [clientNote, setClientNote] = useState("");
   const [ticketSubject, setTicketSubject] = useState("");
   const [copiedId, setCopiedId] = useState(null);
-  const [liveUser, setLiveUser] = useState(user);
+
 
 
   // Makikinig tayo sa changes ng document mo sa 'users' collection
@@ -290,7 +290,7 @@ export default function ClientDashboard({
               <button 
                   onClick={() => {
                     // Gamit ang liveUser para ma-detect agad ang activation ng Admin
-                    const hasAccess = liveUser.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date();
+                    const hasAccess = user.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date();
                     
                     if (hasAccess) { 
                       navigate('/billing'); 
