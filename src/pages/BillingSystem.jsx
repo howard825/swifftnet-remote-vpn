@@ -30,7 +30,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   // --- FEATURE: ACCESS SYNC ---
   const hasAccess = useMemo(() => {
     if (!user?.billingAccessUntil) return false;
-    const expiry = liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil);
+    const expiry = user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil);
     return expiry > new Date();
   }, [user?.billingAccessUntil]);
 
@@ -52,12 +52,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
 
     // PROFILE LISTENER (Para sa Activation & Balance Sync)
     const userRef = doc(db, 'users', user.email); // Ginagamit ang EMAIL bilang ID
-    const unsubProfile = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) setLiveUser({ ...user, ...snap.data() });
-    });
+    
+      
 
-    // Isama sa return para mag-unsubscribe
-    return () => { unsubCustomers(); unsubNotices(); unsubCollections(); unsubProfile(); };
+
 
     const fetchSettings = async () => {
         const sDoc = await getDoc(doc(db, 'billing_systems', user.uid));

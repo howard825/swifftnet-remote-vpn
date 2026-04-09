@@ -52,21 +52,7 @@ export default function ClientDashboard({
 
 
   // Makikinig tayo sa changes ng document mo sa 'users' collection
-  useEffect(() => {
-    if (!user?.email) return;
-    
-     // Siguraduhing imported ito o gamitin ang existing
-    const userRef = doc(db, 'users', user.email);
-    
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        console.log("Profile Synced:", docSnap.data());
-        setLiveUser({ ...user, ...docSnap.data() }); // I-merge ang Auth data at Firestore data
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user.email, db]);
+  
 
   // --- LOGIC: BALANCE CALCULATION ---
   const getUserBalance = () => {
