@@ -19,7 +19,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  onst [selectedClients, setSelectedClients] = useState([]);
+  const [selectedClients, setSelectedClients] = useState([]);
   
   
   // SETTINGS STATES
