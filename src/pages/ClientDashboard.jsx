@@ -143,7 +143,7 @@ export default function ClientDashboard({
         category: serviceCategory,
         vpnId,
         service: requestService,
-        protocol: vpnProtocol,
+        protocol: serviceCategory === 'remote' ? 'sstp' : 'l2tp',
         pricePaid: currentPrice,
         promoUsed: isPromoValid ? promoInput.toUpperCase() : "NONE",
         note: clientNote || (serviceCategory === 'internet' ? "Internet VPN Subscription" : "Remote Access"),
@@ -387,24 +387,30 @@ export default function ClientDashboard({
             )}
 
             {assignments.map((asgn) => {
-                const isExpired = new Date() > new Date(asgn.expiry);
+              const isExpired = new Date() > new Date(asgn.expiry);
 
-                const script = (() => {
-                    const protocol = asgn.protocol || 'sstp';
-                    const isInternet = asgn.category === 'internet';
-                    const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
+              const script = (() => {
+                // 1. DITO ANG FIX: Ginawa nating lowercase at trimmed para sigurado ang match
+                // Kung HINDI exactly 'internet', automatic na SSTP ang gagamitin (Remote Access)
+                const categoryName = (asgn.category || '').toLowerCase().trim();
+                const isInternet = categoryName === 'internet';
+                
+                const protocol = isInternet ? 'l2tp' : 'sstp';
+                const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
 
-                    let baseScript = protocol === 'sstp' 
-                    ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
-                    : `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
+                // 2. Base Script Selection
+                let baseScript = protocol === 'l2tp' 
+                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
+                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
 
-                    if (isInternet) {
-                      return `${baseScript}\n/ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping\n/ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade`;
-                    } else {
-                      // Original Remote Script + Silent Monitor Port logic
-                      return `${baseScript}\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
-                    }
-                })();
+                if (isInternet) {
+                  // Internet VPN Script
+                  return `${baseScript}\n/ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping\n/ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade`;
+                } else {
+                  // Original Remote Script + Silent Monitor Port logic (HINDI BINURA)
+                  return `${baseScript}\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
+                }
+              })();
 
               return (
                 <div key={asgn.id} className={`bg-slate-900 rounded-[50px] border p-8 md:p-12 shadow-2xl mb-8 transition-all ${isExpired ? 'border-red-500/50 opacity-80' : 'border-slate-800 hover:border-blue-500/20'}`}>

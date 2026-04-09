@@ -334,9 +334,13 @@ export default function AdminPanel({
                     
                     {/* Protocol Indicator - Lalabas lang kung VPN/Internet request, hindi sa License */}
                     {r.type !== 'billing_license' && (
-                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border shadow-lg ${r.protocol === 'sstp' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-blue-600 text-white border-blue-400'}`}>
-                        PREFERENCE: {r.protocol?.toUpperCase() || 'L2TP'}
-                      </span>
+                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border shadow-lg ${
+                          (r.category === 'internet' ? 'l2tp' : 'sstp') === 'sstp' 
+                          ? 'bg-emerald-600 text-white border-emerald-400' 
+                          : 'bg-blue-600 text-white border-blue-400'
+                        }`}>
+                          PROTOCOL: {r.category === 'internet' ? 'L2TP (INTERNET)' : 'SSTP (REMOTE)'}
+                        </span>
                     )}
                   </div>
 
