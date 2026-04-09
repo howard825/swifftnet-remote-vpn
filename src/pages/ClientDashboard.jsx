@@ -468,18 +468,57 @@ export default function ClientDashboard({
                     </div>
 
                     {/* Setup Command Script */}
-                    <div className="space-y-3">
-                      <p className="text-[9px] font-black text-blue-400 uppercase italic px-2 tracking-widest">MikroTik Router Command:</p>
-                      <div className="bg-black/60 p-6 rounded-3xl border border-slate-800 font-mono text-[10px] text-slate-500 relative group/script">
-                        <pre className="whitespace-pre-wrap leading-relaxed">{script}</pre>
-                        <button 
-                          onClick={() => handleCopy(script, `s-${asgn.id}`)} 
-                          className="absolute right-4 top-4 bg-slate-800 p-2.5 rounded-xl opacity-0 group-hover/script:opacity-100 transition-all shadow-xl hover:bg-slate-700"
-                        >
-                          <IconCopy />
-                        </button>
+                    {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
+                    <div className="bg-slate-950/30 p-6 rounded-[32px] border border-slate-800/50 space-y-4">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Management Access</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        
+                        {/* WINBOX / API (port) */}
+                        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl flex justify-between items-center group/p transition-all hover:border-blue-500/30">
+                          <div>
+                            <p className="text-[7px] font-black text-blue-500 uppercase tracking-widest">Winbox Port</p>
+                            <p className="font-mono text-[11px] font-bold text-white">{asgn.port || '---'}</p>
+                          </div>
+                          <button 
+                            onClick={() => { navigator.clipboard.writeText(asgn.port); alert("Winbox Port Copied!"); }}
+                            className="text-[8px] font-black text-slate-600 hover:text-blue-400 uppercase transition-colors"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* SSH / API (portAux) */}
+                        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl flex justify-between items-center group/p transition-all hover:border-emerald-500/30">
+                          <div>
+                            <p className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">SSH / API Port</p>
+                            <p className="font-mono text-[11px] font-bold text-white">{asgn.portAux || '---'}</p>
+                          </div>
+                          <button 
+                            onClick={() => { navigator.clipboard.writeText(asgn.portAux); alert("SSH Port Copied!"); }}
+                            className="text-[8px] font-black text-slate-600 hover:text-emerald-400 uppercase transition-colors"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* WEB / SILENT (webPort) */}
+                        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl flex justify-between items-center group/p transition-all hover:border-purple-500/30">
+                          <div>
+                            <p className="text-[7px] font-black text-purple-500 uppercase tracking-widest">Web Port</p>
+                            <p className="font-mono text-[11px] font-bold text-white">{asgn.webPort || '---'}</p>
+                          </div>
+                          <button 
+                            onClick={() => { navigator.clipboard.writeText(asgn.webPort); alert("Web Port Copied!"); }}
+                            className="text-[8px] font-black text-slate-600 hover:text-purple-400 uppercase transition-colors"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
                       </div>
                     </div>
+                    {/* --- END: MANAGEMENT PORTS --- */}
 
                     {/* DEPLOYMENT STATUS BUTTON & EXPIRY PROGRESS */}
                     <div className="pt-4 space-y-4">
