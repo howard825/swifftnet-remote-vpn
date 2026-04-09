@@ -150,6 +150,7 @@ export default function App() {
       <Navbar user={user} handleLogout={handleLogout} />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/status" element={<ServerStatus />} />
         <Route path="/about" element={<About />} />
         <Route path="/help" element={<HelpCenter />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
