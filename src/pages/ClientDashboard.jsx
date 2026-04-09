@@ -290,7 +290,7 @@ export default function ClientDashboard({
               <button 
                   onClick={() => {
                     // Gamit ang liveUser para ma-detect agad ang activation ng Admin
-                    const hasAccess = user.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date();
+                    const hasAccess = user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date();
                     
                     if (hasAccess) { 
                       navigate('/billing'); 
@@ -301,7 +301,7 @@ export default function ClientDashboard({
                   className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest shadow-xl transition-all"
                 >
                   {/* Label logic using liveUser */}
-                  {liveUser.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date() 
+                  {user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date() 
                     ? "Open Dashboard" 
                     : `Avail License (₱${prices?.billing_system_license || 150})`}
                 </button>

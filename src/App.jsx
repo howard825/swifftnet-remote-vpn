@@ -130,7 +130,7 @@ export default function App() {
   const commonProps = {
     user, db, base, appId: "swifftnet-remote-v3", ADMIN_EMAIL,
     payments, requests, assignments, tickets, promos, prices,
-    bal: callculatedBal, // <--- Prop para sa Billing System balance sync
+    bal: calculatedBal, // <--- Prop para sa Billing System balance sync
     sendEmail, handleLogout, activeTicket, setActiveTicket, messages, replyBody, setReplyBody, announcement, setAnnouncement, maint, setMaint
   };
 

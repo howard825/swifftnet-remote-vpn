@@ -92,7 +92,7 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
   const handleUnlock = async () => {
     const dynamicPrice = Number(prices?.billing_system_license || 150); 
     const currentBal = Number(bal); // Siguraduhin na number ang balance
-    const currentBal = Number(user?.credits || 0);
+    
 
     if (currentBal < dynamicPrice) return alert(`Insufficient balance! Needs ₱${dynamicPrice}`);
 
