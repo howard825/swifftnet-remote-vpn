@@ -10,6 +10,7 @@ import { onSnapshot, collection, query, where, orderBy, doc } from 'firebase/fir
 // --- PAGES IMPORT ---
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
+import ServerStatus from './pages/ServerStatus';
 import Login from './pages/Login'; 
 import ForgotPassword from './pages/ForgotPassword';
 import AdminPanel from './pages/AdminPanel';
