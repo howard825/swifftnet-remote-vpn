@@ -48,6 +48,25 @@ export default function ClientDashboard({
   const [clientNote, setClientNote] = useState("");
   const [ticketSubject, setTicketSubject] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [liveUser, setLiveUser] = useState(user);
+
+
+  // Makikinig tayo sa changes ng document mo sa 'users' collection
+  useEffect(() => {
+    if (!user?.email) return;
+    
+    const { onSnapshot, doc } = require('firebase/firestore'); // Siguraduhing imported ito o gamitin ang existing
+    const userRef = doc(db, 'users', user.email);
+    
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        console.log("Profile Synced:", docSnap.data());
+        setLiveUser({ ...user, ...docSnap.data() }); // I-merge ang Auth data at Firestore data
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user.email, db]);
 
   // --- LOGIC: BALANCE CALCULATION ---
   const getUserBalance = () => {
@@ -269,22 +288,23 @@ export default function ClientDashboard({
                   </p>
               </div>
               <button 
-                onClick={() => {
-                  // Check access logic
-                  const hasAccess = user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date();
-                  
-                  if (hasAccess) {
-                    navigate('/billing'); // Kung paid na, diretso sa billing dashboard
-                  } else {
-                    handleAvailBilling(); // Kung hindi pa, trigger ang payment request
-                  }
-                }} 
-                className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest shadow-xl transition-all"
-              >
-                {user.billingAccessUntil && (user.billingAccessUntil.toDate ? user.billingAccessUntil.toDate() : new Date(user.billingAccessUntil)) > new Date() 
-                  ? "Open Dashboard" 
-                  : `Avail License (₱${prices?.billing_system_license || 150})`}
-              </button>
+                  onClick={() => {
+                    // Gamit ang liveUser para ma-detect agad ang activation ng Admin
+                    const hasAccess = liveUser.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date();
+                    
+                    if (hasAccess) { 
+                      navigate('/billing'); 
+                    } else { 
+                      handleAvailBilling(); 
+                    }
+                  }} 
+                  className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest shadow-xl transition-all"
+                >
+                  {/* Label logic using liveUser */}
+                  {liveUser.billingAccessUntil && (liveUser.billingAccessUntil.toDate ? liveUser.billingAccessUntil.toDate() : new Date(liveUser.billingAccessUntil)) > new Date() 
+                    ? "Open Dashboard" 
+                    : `Avail License (₱${prices?.billing_system_license || 150})`}
+                </button>
           </div>
 
           <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-[40px] text-center shadow-xl flex flex-col justify-center">
