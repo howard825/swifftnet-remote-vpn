@@ -177,7 +177,12 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   };
 
   // 1. Hanapin muna ang assignment/node ng user na ito
-  const myNode = assignments.find(a => a.clientEmail === user.email);
+  // Gawin nating lowercase pareho para sigurado ang match
+  const myNode = useMemo(() => {
+  return assignments.find(a => 
+    (a.clientEmail || '').toLowerCase() === (user.email || '').toLowerCase()
+    );
+  }, [assignments, user.email]);
 
   // --- TRIGGER: SYNC PROFILES ---
   const handleSyncProfiles = async () => {
@@ -216,24 +221,24 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   };
 
   const pppProfiles = useMemo(() => {
-    if (!myNode?.lastSyncProfiles) return ["default"];
+    // 1. Safe check kung may data na sa Firestore
+    if (!myNode || !myNode.lastSyncProfiles) return ["default"];
 
-    // Mas malawak na regex: Hinahanap ang "name=" hanggang sa makakita ng separator
-    // Tinanggal ang dot (.) sa unahan dahil ito ang nagpapamali kanina
-    const regex = /name="?([^;,\s"]+)"?/g;
+    // 2. Ang Regex na walang dot (.) sa unahan para sakto sa MikroTik output
+    const regex = /name="?([^;|\s"]+)"?/g;
     const found = [];
     let match;
 
     while ((match = regex.exec(myNode.lastSyncProfiles)) !== null) {
       const profileName = match[1];
-      // Wag isama ang mga system defaults para malinis ang listahan
-      if (profileName !== "default-encryption" && profileName !== "default") {
+      // Filter out system defaults para malinis ang dropdown
+      if (profileName !== "default" && profileName !== "default-encryption") {
         found.push(profileName);
       }
     }
 
-    // Siguraduhing laging may "default" option sa unahan
-    return found.length > 0 ? ["default", ...found] : ["default"];
+    // 3. I-return ang listahan na may laging "default" sa unahan
+    return ["default", ...found];
   }, [myNode?.lastSyncProfiles]);
 
   const updateBranding = async (color) => {
