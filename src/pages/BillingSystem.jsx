@@ -283,20 +283,27 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   }, [myNode?.lastSyncProfiles]);
 
   const mikrotikSecrets = useMemo(() => {
-    if (!myNode?.lastSyncSecrets) return [];
-    
-    // Regex para mahuli ang name, service, at profile sa bawat line
-    const regex = /name="?([^";\s]+)"?\s+service=([^";\s]+)\s+profile="?([^";\s]+)"?/g;
-    const found = [];
-    let match;
+  if (!myNode?.lastSyncSecrets) return [];
+  
+  // BAGONG REGEX: Mas "flexible" para mahuli ang data kahit may nakaharang na caller-id o password
+  const regex = /name=([^\s]+)\s+.*?service=([^\s]+)\s+.*?profile=([^\s]+)/g;
+  const found = [];
+  let match;
 
-    while ((match = regex.exec(myNode.lastSyncSecrets)) !== null) {
-      found.push({
-        name: match[1],
-        service: match[2],
-        profile: match[3]
-      });
-    }
+  while ((match = regex.exec(myNode.lastSyncSecrets)) !== null) {
+    // Linisin ang data (tanggalin ang quotes kung meron)
+    const cleanName = match[1].replace(/"/g, '');
+    const cleanService = match[2].replace(/"/g, '');
+    const cleanProfile = match[3].replace(/"/g, '');
+
+    found.push({
+      name: cleanName,
+      service: cleanService,
+      profile: cleanProfile
+    });
+  }
+  
+    console.log("Found Secrets:", found); // Tignan mo sa F12 Console kung may lumalabas na array
     return found;
   }, [myNode?.lastSyncSecrets]);
 
