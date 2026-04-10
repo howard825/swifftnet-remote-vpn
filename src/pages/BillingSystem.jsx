@@ -221,24 +221,27 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   };
 
   const pppProfiles = useMemo(() => {
-    // 1. Safe check kung may data na sa Firestore
     if (!myNode || !myNode.lastSyncProfiles) return ["default"];
 
-    // 2. Ang Regex na walang dot (.) sa unahan para sakto sa MikroTik output
-    const regex = /name="?([^;|\s"]+)"?/g;
+    // Universal Regex: Hinahanap ang name= tapos kinukuha ang text sa loob ng quotes 
+    // o hanggang sa makakita ng space/semicolon.
+    const regex = /name="?([^";\n\r]+)"?/g;
     const found = [];
     let match;
 
     while ((match = regex.exec(myNode.lastSyncProfiles)) !== null) {
-      const profileName = match[1];
-      // Filter out system defaults para malinis ang dropdown
+      const profileName = match[1].trim();
+      
+      // Wag isama ang system profiles para malinis ang dropdown
       if (profileName !== "default" && profileName !== "default-encryption") {
         found.push(profileName);
       }
     }
 
-    // 3. I-return ang listahan na may laging "default" sa unahan
-    return ["default", ...found];
+    // I-sort natin alphabetically para madaling hanapin ng WISP ang plan nila
+    const sortedProfiles = found.sort((a, b) => a.localeCompare(b));
+
+    return ["default", ...sortedProfiles];
   }, [myNode?.lastSyncProfiles]);
 
   const updateBranding = async (color) => {
@@ -287,26 +290,19 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
         createdAt: serverTimestamp()
       });
       // I-push din sa MikroTik via Bridge
+      // ... sa loob ng saveCustomer ...
       await handleAddPppToRouter({
         name: fd.get('customerName').toLowerCase().replace(/\s+/g, ''),
-        pass: fd.get('pppPassword'), // Gagawa tayo ng input field para rito
-        profile: fd.get('pppProfile'),  // Gagawa tayo ng select field para rito
-        service: fd.get('pppService'),
+        pass: fd.get('pppPassword'),
+        profile: fd.get('pppProfile'),
+        service: fd.get('pppService'), // Siguraduhin na may koma sa dulo nito
       });
-      <div>
-    <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">MikroTik Service Type</label>
-    <select name="pppService" required className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase">
-      <option value="pppoe">PPPoE</option>
-      <option value="hotspot">Hotspot</option>
-      <option value="l2tp">L2TP</option>
-      <option value="any">Any</option>
-    </select>
-  </div>
+
       setShowAddModal(false);
       alert("Client Record Created!");
     } catch (err) { alert(err.message); }
     finally { setLoading(false); }
-  };
+  }; // <--- End of function
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -795,7 +791,17 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
                   <select name="pppProfile" required className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase">
                     {pppProfiles.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
+                  {/* I-paste mo ito sa loob ng showAddModal form, sa ilalim ng PPP Profile selection */}
                 </div>
+                <div>
+                    <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">MikroTik Service Type</label>
+                    <select name="pppService" required className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase">
+                      <option value="pppoe">PPPoE</option>
+                      <option value="hotspot">Hotspot</option>
+                      <option value="l2tp">L2TP</option>
+                      <option value="any">Any</option>
+                    </select>
+                  </div>
               </div>
 
               {/* --- SECTION 3: NETWORK INVENTORY (ORIGINAL) --- */}
