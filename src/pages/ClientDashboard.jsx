@@ -99,6 +99,7 @@ export default function ClientDashboard({
   const navigate = useNavigate();
 
   // --- INTERNAL UI STATES ---
+  const [loading, setLoading] = useState(false);
   const [serviceCategory, setServiceCategory] = useState("remote"); // remote or internet
   const [requestService, setRequestService] = useState("winbox");
   const [vpnProtocol, setVpnProtocol] = useState("sstp");
@@ -107,6 +108,7 @@ export default function ClientDashboard({
   const [clientNote, setClientNote] = useState("");
   const [ticketSubject, setTicketSubject] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+
 
 
 
