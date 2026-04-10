@@ -189,6 +189,52 @@ export default function ClientDashboard({
     }
   };
 
+  const handleBuyVPN = async () => {
+    // 1. Pre-flight Checks
+    if (!canAfford) return alert("Insufficient balance to buy this VPN.");
+    
+    // Kailangan natin ng target node (assignment) para alam ng Bridge kung saan mag-co-connect
+    if (!assignments || assignments.length === 0) {
+      return alert("You need an active Node Assignment first before buying a VPN.");
+    }
+
+    try {
+      setLoading(true);
+
+      // 2. ⚡ THE BRIDGE TRIGGER: Create Provisioning Task
+      // Ito ang babasahin ng Bridge machine mo sa 'tasks' collection
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+        type: 'PROVISION_VPN',
+        email: user.email,
+        uid: user.uid,
+        nodeId: assignments[0].id, // Target node
+        category: serviceCategory, // 'remote' or 'internet'
+        service: requestService,   // 'winbox', 'api', etc.
+        pricePaid: currentPrice,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // 3. RECORD TRANSACTION (Para mabawasan ang balance sa UI)
+      await addDoc(collection(db, ...base, 'requests'), {
+        email: user.email,
+        status: 'assigned', // Auto-approved
+        type: 'new_vpn_auto',
+        category: serviceCategory,
+        service: requestService,
+        pricePaid: currentPrice,
+        note: `Auto-Provisioned VPN: ${serviceCategory.toUpperCase()}`,
+        date: serverTimestamp()
+      });
+
+      alert("🚀 MISSION SUCCESS! System is now provisioning your VPN and NAT Rules. Please wait, credentials will be ready in 30 seconds!");
+    } catch (err) {
+      alert("System Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVpnRequest = async (type = 'new', vpnId = null) => {
     if (bal < currentPrice) return alert("Insufficient balance.");
 
@@ -419,8 +465,12 @@ export default function ClientDashboard({
                 {serviceCategory === 'internet' && <option value="internet">Internet</option>}
                 <option value="api">API / SSH</option>
               </select>
-              <button onClick={()=>handleVpnRequest()} disabled={!canAfford} className={`w-full py-4 rounded-xl font-black text-[10px] uppercase transition-all ${canAfford ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-600'}`}>
-                {canAfford ? 'Buy Now' : 'Refill Balance'}
+              <button 
+                onClick={() => handleBuyVPN()} 
+                disabled={!canAfford || loading} 
+                className={`w-full py-4 rounded-xl font-black text-[10px] uppercase transition-all ${canAfford ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-600'}`}
+              >
+                {loading ? 'PROVISIONING...' : canAfford ? 'Buy Now' : 'Refill Balance'}
               </button>
             </div>
           </div>

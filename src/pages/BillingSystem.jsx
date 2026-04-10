@@ -82,14 +82,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
     // 1. KUNG NAGBAYAD NA NGAYONG BUWAN
     if (client.lastPaidMonth === currentMonthYear) return 'paid';
 
-    // 2. KUNG LUMAMPAS NA NG 5 DAYS SA DUE DATE (CUT/DISCONNECTED)
-    // Halimbawa: Due date is 15, ngayon ay 20 na.
-    if (dayToday > (dueDate + 5)) return 'cut';
+    // 2. 🚨 NO GRACE PERIOD: Pag "Due Date" na o "Lampas" na, CUT agad.
+    if (dayToday >= dueDate) return 'cut';
 
-    // 3. KUNG LUMAMPAS NA SA DUE DATE PERO WALA PANG 5 DAYS (OVERDUE)
-    if (dayToday > dueDate) return 'overdue';
-
-    // 4. KUNG BAGO PA LANG ANG BUWAN AT HINDI PA DUE DATE (UNPAID/PENDING)
+    // 3. KUNG BAGO PA LANG ANG BUWAN AT HINDI PA DUE DATE
     return 'pending'; 
   };
 
