@@ -291,7 +291,17 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
         name: fd.get('customerName').toLowerCase().replace(/\s+/g, ''),
         pass: fd.get('pppPassword'), // Gagawa tayo ng input field para rito
         profile: fd.get('pppProfile')  // Gagawa tayo ng select field para rito
+        service: fd.get('pppService')
       });
+      <div>
+    <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">MikroTik Service Type</label>
+    <select name="pppService" required className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase">
+      <option value="pppoe">PPPoE</option>
+      <option value="hotspot">Hotspot</option>
+      <option value="l2tp">L2TP</option>
+      <option value="any">Any</option>
+    </select>
+  </div>
       setShowAddModal(false);
       alert("Client Record Created!");
     } catch (err) { alert(err.message); }
