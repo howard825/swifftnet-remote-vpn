@@ -243,6 +243,44 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
     }
   };
 
+  const handleBulkImport = async () => {
+    // 1. Kunin lang yung mga wala pa sa customers list mo para walang duplicate
+    const toImport = mikrotikSecrets.filter(secret => 
+      !customers.some(c => (c.name || '').toLowerCase() === secret.name.toLowerCase())
+    );
+
+    if (toImport.length === 0) return alert("Lahat ng secrets ay nandoon na sa Billing!");
+
+    if (!window.confirm(`Import ${toImport.length} new clients to Billing System?`)) return;
+
+    setLoading(true);
+    try {
+      const batch = writeBatch(db); // Gagamit ng Batch para mabilis
+
+      toImport.forEach(secret => {
+        const newDocRef = doc(collection(db, 'billing_systems', user.uid, 'customers'));
+        batch.set(newDocRef, {
+          name: secret.name.toUpperCase(),
+          planName: secret.profile.toUpperCase(),
+          monthlyFee: 500, // Default fee (i-edit na lang nila later)
+          dueDate: "1",
+          dateInstalled: new Date().toISOString().split('T')[0],
+          installationBalance: 0,
+          lastPaidMonth: "",
+          history: [],
+          createdAt: serverTimestamp()
+        });
+      });
+
+      await batch.commit();
+      alert(`🚀 Mission Success! ${toImport.length} clients added to database.`);
+    } catch (err) {
+      alert("Bulk Import Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- TRIGGER: ADD PPP USER ---
   const handleAddPppToRouter = async (pppData) => {
     // pppData = { name, pass, profile }
@@ -570,6 +608,13 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
               <h3 className="text-sm font-black text-emerald-500 uppercase italic tracking-widest">Router Discovery ({mikrotikSecrets.length})</h3>
               <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Found active secrets on MikroTik. Import them to your Billing System.</p>
             </div>
+            <button 
+              onClick={handleBulkImport}
+              disabled={loading}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase transition-all shadow-xl active:scale-95 disabled:opacity-50"
+            >
+              {loading ? "IMPORTING..." : "⚡ Bulk Import All New"}
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
