@@ -560,7 +560,7 @@ export default function ClientDashboard({
                       <div className="bg-slate-950 p-5 rounded-3xl border border-slate-800 flex justify-between items-center group/item transition-all hover:border-emerald-500/50">
                         <div className="space-y-1">
                           <p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">SSH / API Management Port</p>
-                          <p className="text-[12px] font-mono font-bold text-blue-400 italic tracking-tight">{asgn.sshPort || asgn.apiPort || 'N/A'}</p>
+                          <p className="text-[12px] font-mono font-bold text-blue-400 italic tracking-tight">{asgn.portAux || 'N/A'}</p>
                         </div>
                         <button onClick={() => handleCopy(`${asgn.sshPort || asgn.apiPort}`, `merged-${asgn.id}`)} className="bg-slate-900 p-3 rounded-xl text-slate-500 hover:text-emerald-500 hover:bg-slate-800 transition-all shadow-lg">
                           <IconCopy />
@@ -584,6 +584,32 @@ export default function ClientDashboard({
                     {/* ROUTER ACCESS SETTINGS */}
                     {/* ROUTER AUTOMATION COMPONENT */}
                     <RouterAutomationSettings asgn={asgn} db={db} appId={appId} />
+
+                    {/* --- START: MIKROTIK DEPLOYMENT SCRIPT --- */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center px-2">
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest italic">MikroTik Deployment Script</p>
+                        <button 
+                          onClick={() => { handleCopy(script, `script-${asgn.id}`); alert("Script Copied! Paste this in Winbox Terminal."); }}
+                          className="text-[8px] font-black text-white bg-blue-600 px-3 py-1 rounded-lg uppercase hover:bg-blue-500 transition-all"
+                        >
+                          Copy Full Script
+                        </button>
+                      </div>
+                      
+                      <div className="relative group">
+                        <textarea 
+                          readOnly 
+                          value={script}
+                          className="w-full bg-black/60 border border-slate-800 p-6 rounded-[30px] text-[10px] font-mono text-emerald-500 h-32 outline-none resize-none custom-scrollbar shadow-inner"
+                        />
+                        <div className="absolute inset-0 bg-blue-500/5 pointer-events-none rounded-[30px] group-hover:bg-transparent transition-all" />
+                      </div>
+                      <p className="text-[8px] text-slate-600 font-bold italic px-2">
+                        ⚠️ Copy this script and paste it directly into your MikroTik's **New Terminal**.
+                      </p>
+                    </div>
+                    {/* --- END: MIKROTIK DEPLOYMENT SCRIPT --- */}
 
                     {/* Setup Command Script */}
                     {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
