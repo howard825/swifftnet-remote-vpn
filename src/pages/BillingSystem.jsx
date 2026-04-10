@@ -479,21 +479,63 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   };
 
   const markAsPaid = async (client) => {
-    const today = new Date();
-    const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
-    if (getCustomerStatus(client) === 'paid') return alert("Already paid!");
+  const today = new Date();
+  const currentMonthYear = `${today.getMonth() + 1}-${today.getFullYear()}`;
+  
+  try {
+    const customerRef = doc(db, 'billing_systems', user.uid, 'customers', client.id);
+    
+    // 1. Update Firestore
+    await updateDoc(customerRef, {
+      lastPaidMonth: currentMonthYear,
+      history: arrayUnion({ 
+        date: today.toLocaleDateString(), 
+        amount: client.monthlyFee, 
+        type: 'Full Payment' 
+      })
+    });
 
-    try {
-      const customerRef = doc(db, 'billing_systems', user.uid, 'customers', client.id);
-      await updateDoc(customerRef, {
-        lastPaidMonth: currentMonthYear,
-        history: arrayUnion({ date: today.toLocaleDateString(), amount: client.monthlyFee, type: 'Full Payment' })
-      });
-      await addDoc(collection(db, 'billing_systems', user.uid, 'collections'), {
-          customerName: client.name, amount: client.monthlyFee, timestamp: serverTimestamp(), dateStr: today.toLocaleDateString()
-      });
-      alert("Payment Confirmed!");
-    } catch (err) { alert(err.message); }
+    // 2. ⚡ Push Reconnect Task (Instant)
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+      type: 'RECONNECT_USER',
+      nodeId: myNode.id,
+      status: 'pending',
+      data: { 
+        name: client.name.toLowerCase().replace(/\s+/g, ''),
+        profile: client.planName // Ibalik sa original na speed profile
+      },
+      createdAt: serverTimestamp()
+    });
+
+    alert(`✅ Payment for ${client.name} recorded. Reconnection command sent!`);
+  } catch (err) { alert(err.message); }
+};
+
+  const handleDailyCut = async () => {
+    // Hanapin lahat ng clients na ang status ay 'cut' (lagpas 5 days sa due)
+    const clientsToCut = customers.filter(c => getCustomerStatus(c) === 'cut');
+
+    if (clientsToCut.length === 0) return alert("Walang nodes na kailangang i-cut ngayong araw.");
+
+    if (window.confirm(`Execute Auto-Cut for ${clientsToCut.length} overdue clients?`)) {
+      setLoading(true);
+      try {
+        const batch = writeBatch(db);
+        for (const client of clientsToCut) {
+          const taskRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'));
+          batch.set(taskRef, {
+            type: 'DISABLE_PPP_USER',
+            nodeId: myNode.id,
+            status: 'pending',
+            data: { name: client.name.toLowerCase().replace(/\s+/g, '') },
+            createdAt: serverTimestamp()
+          });
+        }
+        await batch.commit();
+        alert("🚨 Disconnection tasks deployed to Bridge!");
+      } catch (err) { alert(err.message); }
+      finally { setLoading(false); }
+    }
   };
 
   const approveNotice = async (notice) => {
