@@ -467,6 +467,37 @@ export default function ClientDashboard({
                       </div>
                     </div>
 
+
+                    {/* ROUTER ACCESS SETTINGS */}
+                    <div className="mt-4 p-4 bg-blue-600/5 rounded-2xl border border-blue-500/10 space-y-3">
+                      <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Router Automation Credentials</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Router Username"
+                          defaultValue={asgn.routerUser}
+                          onBlur={async (e) => {
+                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
+                            await updateDoc(ref, { routerUser: e.target.value });
+                          }}
+                          className="bg-slate-950 border border-slate-800 p-2 rounded-lg text-[10px] font-mono outline-none focus:border-blue-500"
+                        />
+                        <input 
+                          type="password"
+                          placeholder="Router Password"
+                          defaultValue={asgn.routerPass}
+                          onBlur={async (e) => {
+                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
+                            await updateDoc(ref, { routerPass: e.target.value });
+                          }}
+                          className="bg-slate-950 border border-slate-800 p-2 rounded-lg text-[10px] font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <p className="text-[7px] text-slate-600 italic leading-tight">
+                        *Note: Ito ang admin login ng MikroTik mo para gumana ang Auto-Disable feature.
+                      </p>
+                    </div>
+
                     {/* Setup Command Script */}
                     {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
                     <div className="bg-slate-950/30 p-6 rounded-[32px] border border-slate-800/50 space-y-4">

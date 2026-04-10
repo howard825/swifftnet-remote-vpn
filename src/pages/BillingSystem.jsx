@@ -9,7 +9,7 @@ import {
   IconCopy, IconEdit, IconDownload, IconShield 
 } from '../components/Icons';
 
-export default function BillingSystem({ user, db, bal, appId, prices, base }) {
+export default function BillingSystem({ user, db, bal, appId, prices, base, assignments }) {
   // --- STATES ---
   const [customers, setCustomers] = useState([]);
   const [notices, setNotices] = useState([]); 
@@ -176,6 +176,53 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
     }
   };
 
+  // 1. Hanapin muna ang assignment/node ng user na ito
+  const myNode = assignments.find(a => a.clientEmail === user.email);
+
+  // --- TRIGGER: SYNC PROFILES ---
+  const handleSyncProfiles = async () => {
+    if (!myNode?.routerUser || !myNode?.routerPass) {
+      return alert("⚠️ I-setup muna ang Router User/Pass sa Client Dashboard!");
+    }
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+        type: 'SYNC_PROFILES',
+        nodeId: myNode.id, // ID ng tunnel assignment
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      alert("🔄 Sync Request Sent! Wait for the Bridge...");
+    } catch (err) { alert(err.message); }
+  };
+
+  // --- TRIGGER: ADD PPP USER ---
+  const handleAddPppToRouter = async (pppData) => {
+    // pppData = { name, pass, profile }
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+        type: 'ADD_PPP_USER',
+        nodeId: myNode.id,
+        status: 'pending',
+        data: pppData,
+        createdAt: serverTimestamp()
+      });
+      console.log("➕ Add User task created.");
+    } catch (err) { console.error(err); }
+  };
+
+  const pppProfiles = useMemo(() => {
+    if (!myNode?.lastSyncProfiles) return [];
+    // Simple parser: Hahanapin lahat ng .name= field sa raw string
+    const regex = /\.name=([^;|\s]+)/g;
+    const found = [];
+    let match;
+    while ((match = regex.exec(myNode.lastSyncProfiles)) !== null) {
+      found.push(match[1]);
+    }
+    return found.length > 0 ? found : ["default"]; // Fallback sa default
+  }, [myNode?.lastSyncProfiles]);
+
   const updateBranding = async (color) => {
     try {
       setPrimaryColor(color);
@@ -213,13 +260,19 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
       await addDoc(collection(db, 'billing_systems', user.uid, 'customers'), {
         name: fd.get('customerName').toUpperCase(),
         planName: fd.get('planName').toUpperCase(),
-        monthlyFee: Number(fd.get('planPrice')), // Kinonek natin sa fee para hindi masira ang analytics
+        monthlyFee: Number(fd.get('monthlyFee')), // Kinonek natin sa fee para hindi masira ang analytics
         dueDate: fd.get('dueDate'),
         dateInstalled: fd.get('dateInstalled'),
         installationBalance: Number(fd.get('installBal')),
         lastPaidMonth: "",
         history: [],
         createdAt: serverTimestamp()
+      });
+      // I-push din sa MikroTik via Bridge
+      await handleAddPppToRouter({
+        name: fd.get('customerName').toLowerCase().replace(/\s+/g, ''),
+        pass: fd.get('pppPassword'), // Gagawa tayo ng input field para rito
+        profile: fd.get('pppProfile')  // Gagawa tayo ng select field para rito
       });
       setShowAddModal(false);
       alert("Client Record Created!");
@@ -395,6 +448,19 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
             <p className="text-[9px] text-blue-500 font-black uppercase mb-1">Total Income</p>
             <p className="text-4xl font-black text-white italic">₱{lifetimeIncome.toLocaleString()}</p>
         </div>
+      </div>
+
+      <div className="bg-slate-900/50 p-6 rounded-[30px] border border-slate-800 flex justify-between items-center">
+        <div>
+          <h4 className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Router Synchronization</h4>
+          <p className="text-xs text-slate-400">Fetch latest PPP profiles from your MikroTik</p>
+        </div>
+        <button 
+          onClick={handleSyncProfiles}
+          className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
+        >
+          Sync Profiles
+        </button>
       </div>
 
       {/* QUEUE & HISTORY GRID */}
@@ -678,6 +744,19 @@ export default function BillingSystem({ user, db, bal, appId, prices, base }) {
                 <div>
                   <label className="text-[8px] text-orange-600 font-black uppercase ml-4 mb-2 block">Install Balance</label>
                   <input name="installBal" type="number" defaultValue="0" className="w-full bg-slate-950 border border-orange-500/30 p-5 rounded-3xl outline-none font-black text-sm text-orange-500 text-center" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">MikroTik PPP Password</label>
+                  <input name="pppPassword" required placeholder="PASSWORD" className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-xs text-white" />
+                </div>
+                <div>
+                  <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">PPP Profile (Speed Plan)</label>
+                  <select name="pppProfile" required className="w-full bg-slate-950 border border-blue-500/30 p-5 rounded-3xl outline-none font-black text-[10px] text-white uppercase">
+                    {pppProfiles.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
               </div>
 
