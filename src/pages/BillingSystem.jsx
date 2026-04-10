@@ -205,6 +205,22 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
     }
   };
 
+    const handleSyncSecrets = async () => {
+    if (!myNode?.id) return alert("❌ No Node Linked!");
+    
+    try {
+      setLoading(true);
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+        type: 'SYNC_SECRETS',
+        nodeId: myNode.id,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      alert("🔄 Secrets Sync Request Sent! Wait for bridge to finish.");
+    } catch (err) { alert(err.message); }
+    finally { setLoading(false); }
+  };
+
   // --- TRIGGER: ADD PPP USER ---
   const handleAddPppToRouter = async (pppData) => {
     // pppData = { name, pass, profile }
@@ -243,6 +259,24 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
 
     return ["default", ...sortedProfiles];
   }, [myNode?.lastSyncProfiles]);
+
+  const mikrotikSecrets = useMemo(() => {
+    if (!myNode?.lastSyncSecrets) return [];
+    
+    // Regex para mahuli ang name, service, at profile sa bawat line
+    const regex = /name="?([^";\s]+)"?\s+service=([^";\s]+)\s+profile="?([^";\s]+)"?/g;
+    const found = [];
+    let match;
+
+    while ((match = regex.exec(myNode.lastSyncSecrets)) !== null) {
+      found.push({
+        name: match[1],
+        service: match[2],
+        profile: match[3]
+      });
+    }
+    return found;
+  }, [myNode?.lastSyncSecrets]);
 
   const updateBranding = async (color) => {
     try {
@@ -485,12 +519,26 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
         >
           Sync Profiles
         </button>
-        <div className="mt-4 p-4 bg-black rounded-xl border border-slate-800">
+
+        <button 
+          onClick={handleSyncSecrets}
+          className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
+        >
+          Sync All Secrets
+        </button>
+        {/*<div className="mt-4 p-4 bg-black rounded-xl border border-slate-800">
           <p className="text-[8px] text-slate-500 font-black uppercase mb-2">Bridge Data Debug:</p>
           <code className="text-[10px] text-emerald-500 break-all">
             {myNode?.lastSyncProfiles ? myNode.lastSyncProfiles : "NO DATA IN FIRESTORE YET"}
           </code>
-        </div>
+        </div>*/}
+
+        <button 
+          onClick={handleSyncSecrets}
+          className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
+        >
+          Sync All Secrets
+        </button>
       </div>
 
       {/* QUEUE & HISTORY GRID */}
