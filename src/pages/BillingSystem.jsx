@@ -186,14 +186,18 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
     }
 
     try {
+    // SIGURADUHIN NA GANITO ANG PATH:
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
         type: 'SYNC_PROFILES',
-        nodeId: myNode.id, // ID ng tunnel assignment
+        nodeId: myNode.id,
         status: 'pending',
         createdAt: serverTimestamp()
       });
-      alert("🔄 Sync Request Sent! Wait for the Bridge...");
-    } catch (err) { alert(err.message); }
+      alert("🔄 Sync Request Sent!");
+    } catch (err) { 
+      console.error("Firebase Error:", err); // Tignan mo kung may lalabas na error sa Console (F12)
+      alert(err.message); 
+    }
   };
 
   // --- TRIGGER: ADD PPP USER ---
