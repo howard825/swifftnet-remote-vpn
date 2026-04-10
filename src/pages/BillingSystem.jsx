@@ -290,8 +290,8 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
       await handleAddPppToRouter({
         name: fd.get('customerName').toLowerCase().replace(/\s+/g, ''),
         pass: fd.get('pppPassword'), // Gagawa tayo ng input field para rito
-        profile: fd.get('pppProfile')  // Gagawa tayo ng select field para rito
-        service: fd.get('pppService')
+        profile: fd.get('pppProfile'),  // Gagawa tayo ng select field para rito
+        service: fd.get('pppService'),
       });
       <div>
     <label className="text-[8px] text-blue-500 font-black uppercase ml-4 mb-2 block">MikroTik Service Type</label>
@@ -682,6 +682,10 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
               cut: 'border-red-500/40 text-red-500 bg-red-500/20 animate-pulse',
               pending: 'border-slate-800 text-slate-400 bg-slate-900/50'
             };
+
+            <div className="bg-red-600 text-white p-2 text-[8px] font-mono">
+              DEBUG: My Email: [{user.email}] | Node Email: [{myNode?.clientEmail}] | Field Exists: {myNode?.lastSyncProfiles ? "YES" : "NO"}
+            </div>
           return (
             <div key={client.id} className={`bg-slate-900 p-8 rounded-[45px] border flex flex-col justify-between transition-all group ${status === 'paid' ? 'border-emerald-500/20 shadow-lg' : status === 'overdue' ? 'border-red-500/20' : 'border-slate-800'}`}>
                 <div className="absolute top-6 left-6 z-10">
