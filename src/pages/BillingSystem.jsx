@@ -221,6 +221,28 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
     finally { setLoading(false); }
   };
 
+  const handleImportSecret = async (secret) => {
+    try {
+      setLoading(true);
+      await addDoc(collection(db, 'billing_systems', user.uid, 'customers'), {
+        name: secret.name.toUpperCase(),
+        planName: secret.profile.toUpperCase(),
+        monthlyFee: 500, // Default fee
+        dueDate: "1",
+        dateInstalled: new Date().toISOString().split('T')[0],
+        installationBalance: 0,
+        lastPaidMonth: "",
+        history: [],
+        createdAt: serverTimestamp()
+      });
+      alert(`✅ ${secret.name} imported to Billing!`);
+    } catch (err) {
+      alert("Import Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- TRIGGER: ADD PPP USER ---
   const handleAddPppToRouter = async (pppData) => {
     // pppData = { name, pass, profile }
@@ -533,12 +555,44 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
           </code>
         </div>*/}
 
-        <button 
-          onClick={handleSyncSecrets}
-          className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
-        >
-          Sync All Secrets
-        </button>
+        {/* STEP 2: MIKROTIK DISCOVERY QUEUE */}
+      {mikrotikSecrets.length > 0 && (
+        <div className="bg-emerald-500/5 border border-emerald-500/20 p-8 rounded-[40px] mb-12 animate-in fade-in slide-in-from-top-4">
+          <div className="flex justify-between items-center mb-6 border-b border-emerald-500/10 pb-4">
+            <div>
+              <h3 className="text-sm font-black text-emerald-500 uppercase italic tracking-widest">Router Discovery ({mikrotikSecrets.length})</h3>
+              <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Found active secrets on MikroTik. Import them to your Billing System.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+            {mikrotikSecrets.map((secret, idx) => {
+              // Check kung existing na itong user sa cards mo (Case-insensitive check)
+              const isExisting = customers.some(c => (c.name || '').toLowerCase() === secret.name.toLowerCase());
+              
+              return (
+                <div key={idx} className="bg-slate-950/50 p-5 rounded-3xl border border-slate-800 flex justify-between items-center group hover:border-emerald-500/30 transition-all">
+                  <div>
+                    <p className="text-xs font-black text-white uppercase">{secret.name}</p>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase">{secret.profile} • {secret.service}</p>
+                  </div>
+                  {isExisting ? (
+                    <span className="bg-slate-900 px-3 py-1 rounded-full text-[7px] font-black text-slate-600 uppercase tracking-tighter">Already Linked</span>
+                  ) : (
+                    <button 
+                      onClick={() => handleImportSecret(secret)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-[8px] font-black uppercase transition-all shadow-lg active:scale-95"
+                    >
+                      + Import
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       </div>
 
       {/* QUEUE & HISTORY GRID */}
