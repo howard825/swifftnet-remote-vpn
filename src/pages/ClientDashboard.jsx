@@ -11,6 +11,65 @@ import {
   IconHistory, IconCopy, IconCheck 
 } from '../components/Icons';
 
+
+const RouterAutomationSettings = ({ asgn, db, appId }) => {
+  const [rUser, setRUser] = useState(asgn.routerUser || "");
+  const [rPass, setRPass] = useState(asgn.routerPass || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const ref = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
+      await updateDoc(ref, { 
+        routerUser: rUser, 
+        routerPass: rPass 
+      });
+      alert("✅ Router Credentials Linked!");
+    } catch (err) {
+      alert("❌ Error: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 p-5 bg-blue-600/5 rounded-[30px] border border-blue-500/10 space-y-4">
+      <div className="flex justify-between items-center px-2">
+        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Router Automation Credentials</p>
+        <span className={`text-[7px] font-black px-2 py-1 rounded-full ${asgn.routerPass ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+          {asgn.routerPass ? 'CONNECTED' : 'NOT LINKED'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <input 
+          type="text"
+          placeholder="Router User"
+          value={rUser}
+          onChange={(e) => setRUser(e.target.value)}
+          className="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-mono outline-none focus:border-blue-500 text-white"
+        />
+        <input 
+          type="password"
+          placeholder="Router Pass"
+          value={rPass}
+          onChange={(e) => setRPass(e.target.value)}
+          className="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-[10px] font-mono outline-none focus:border-blue-500 text-white"
+        />
+      </div>
+
+      <button 
+        onClick={handleSave}
+        disabled={isSaving}
+        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 py-4 rounded-2xl text-[9px] font-black uppercase transition-all shadow-lg"
+      >
+        {isSaving ? 'Linking...' : 'Save & Link Router'}
+      </button>
+    </div>
+  );
+};
+
 export default function ClientDashboard({ 
   user,           // Current logged-in user
   payments,       // Synced payments (filtered to user)
@@ -398,6 +457,8 @@ export default function ClientDashboard({
                 const protocol = isInternet ? 'l2tp' : 'sstp';
                 const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
 
+
+
                 // 2. Base Script Selection
                 let baseScript = protocol === 'l2tp' 
                   ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
@@ -469,34 +530,8 @@ export default function ClientDashboard({
 
 
                     {/* ROUTER ACCESS SETTINGS */}
-                    <div className="mt-4 p-4 bg-blue-600/5 rounded-2xl border border-blue-500/10 space-y-3">
-                      <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Router Automation Credentials</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input 
-                          type="text"
-                          placeholder="Router Username"
-                          defaultValue={asgn.routerUser}
-                          onBlur={async (e) => {
-                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
-                            await updateDoc(ref, { routerUser: e.target.value });
-                          }}
-                          className="bg-slate-950 border border-slate-800 p-2 rounded-lg text-[10px] font-mono outline-none focus:border-blue-500"
-                        />
-                        <input 
-                          type="password"
-                          placeholder="Router Password"
-                          defaultValue={asgn.routerPass}
-                          onBlur={async (e) => {
-                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'assignments', asgn.id);
-                            await updateDoc(ref, { routerPass: e.target.value });
-                          }}
-                          className="bg-slate-950 border border-slate-800 p-2 rounded-lg text-[10px] font-mono outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      <p className="text-[7px] text-slate-600 italic leading-tight">
-                        *Note: Ito ang admin login ng MikroTik mo para gumana ang Auto-Disable feature.
-                      </p>
-                    </div>
+                    {/* ROUTER AUTOMATION COMPONENT */}
+                    <RouterAutomationSettings asgn={asgn} db={db} appId={appId} />
 
                     {/* Setup Command Script */}
                     {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
