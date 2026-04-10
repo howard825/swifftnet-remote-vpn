@@ -216,15 +216,24 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
   };
 
   const pppProfiles = useMemo(() => {
-    if (!myNode?.lastSyncProfiles) return [];
-    // Simple parser: Hahanapin lahat ng .name= field sa raw string
-    const regex = /\.name=([^;|\s]+)/g;
+    if (!myNode?.lastSyncProfiles) return ["default"];
+
+    // Mas malawak na regex: Hinahanap ang "name=" hanggang sa makakita ng separator
+    // Tinanggal ang dot (.) sa unahan dahil ito ang nagpapamali kanina
+    const regex = /name="?([^;,\s"]+)"?/g;
     const found = [];
     let match;
+
     while ((match = regex.exec(myNode.lastSyncProfiles)) !== null) {
-      found.push(match[1]);
+      const profileName = match[1];
+      // Wag isama ang mga system defaults para malinis ang listahan
+      if (profileName !== "default-encryption" && profileName !== "default") {
+        found.push(profileName);
+      }
     }
-    return found.length > 0 ? found : ["default"]; // Fallback sa default
+
+    // Siguraduhing laging may "default" option sa unahan
+    return found.length > 0 ? ["default", ...found] : ["default"];
   }, [myNode?.lastSyncProfiles]);
 
   const updateBranding = async (color) => {
@@ -465,6 +474,12 @@ export default function BillingSystem({ user, db, bal, appId, prices, base, assi
         >
           Sync Profiles
         </button>
+        <div className="mt-4 p-4 bg-black rounded-xl border border-slate-800">
+          <p className="text-[8px] text-slate-500 font-black uppercase mb-2">Bridge Data Debug:</p>
+          <code className="text-[10px] text-emerald-500 break-all">
+            {myNode?.lastSyncProfiles ? myNode.lastSyncProfiles : "NO DATA IN FIRESTORE YET"}
+          </code>
+        </div>
       </div>
 
       {/* QUEUE & HISTORY GRID */}
