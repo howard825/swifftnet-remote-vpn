@@ -181,7 +181,14 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/status" element={<ServerStatus />} />
-        
+
+        {/* --- HETO ANG MGA KULANG NA ROUTES (IDAGDAG MO ITO) --- */}
+        <Route path="/about" element={<About />} />
+        <Route path="/help" element={<HelpCenter />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-use" element={<TermsOfUse />} />
+        {/* --------------------------------------------------- */}
+
         {/* I-WRAP ANG DASHBOARD */}
         <Route path="/dashboard" element={
           <MaintenanceGuard pageName="dashboard" maint={maint} user={user}>
@@ -198,10 +205,8 @@ export default function App() {
 
         <Route path="/profile" element={user ? <Profile {...commonProps} /> : <Navigate to="/login" />} />
         
-        {/* ADMIN PANEL: WALANG GUARD DAHIL ADMIN KA */}
         <Route path="/admin" element={user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/" />} />
         
-        {/* MGA PUBLIC PAGES */}
         <Route path="/check-bill" element={<PublicCheckBill />} />
         <Route path="/login" element={!user ? <Login /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)} />
         <Route path="*" element={<Navigate to="/" />} />

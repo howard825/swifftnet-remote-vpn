@@ -15,7 +15,7 @@ export default function About() {
         <div className="grid md:grid-cols-1 gap-6 pt-8">
           <div className="bg-slate-950/50 p-8 rounded-[40px] border border-blue-500/20">
             <h3 className="text-blue-500 font-black uppercase text-xs tracking-widest mb-2">Executive Leadership</h3>
-            <p className="text-2xl font-black text-white italic">Howard Kingsley Ramos</p>
+            <p className="text-2xl font-black text-white italic">Kingsley</p>
             <p className="text-slate-500 text-[10px] font-bold uppercase mt-1">CEO & Lead Developer</p>
           </div>
         </div>
@@ -26,7 +26,7 @@ export default function About() {
         </p>
 
         <div className="pt-6 text-slate-700 text-[9px] font-black uppercase">
-          Based in Santa Ana, Cagayan Valley, Philippines
+          Based in Cagayan Valley, Philippines
         </div>
       </div>
     </div>
