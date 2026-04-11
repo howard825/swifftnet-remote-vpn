@@ -199,7 +199,7 @@ export default function ClientDashboard({
       setLoading(true);
 
       // 🚀 DITO ANG LOGIC SWITCH
-      
+      const taskType = 'PROVISSION_VPN';
 
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
         type: 'PROVISION_VPN',
