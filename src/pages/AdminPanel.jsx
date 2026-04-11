@@ -643,46 +643,100 @@ export default function AdminPanel({
             </div>
 
             {/* MAINTENANCE CARD (System Lockdown) */}
+            {/* 🛡️ ADVANCED SYSTEM CONTROL CENTER */}
             <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 space-y-6 shadow-2xl mt-8 border-t-4 border-t-orange-600">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3 text-orange-500">
-                  <h2 className="text-sm font-black uppercase italic tracking-widest">System Lockdown</h2>
+                  <h2 className="text-sm font-black uppercase italic tracking-widest">System Lockdown Engine</h2>
                 </div>
                 <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${maint?.isActive ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-800 text-slate-500'}`}>
-                  {maint?.isActive ? 'SYSTEM DOWN' : 'SYSTEM LIVE'}
+                  {maint?.isActive ? 'LOCKDOWN ACTIVE' : 'SYSTEM LIVE'}
                 </div>
               </div>
 
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none px-2">Lockdown Message</p>
-              <textarea 
-                className="w-full bg-slate-950 border border-slate-800 p-5 rounded-[2rem] outline-none focus:border-orange-500 font-bold text-xs text-white min-h-[120px] resize-none transition-all"
-                placeholder="Reason for maintenance..."
-                value={maint?.message || ""}
-                onChange={(e) => setMaint({...maint, message: e.target.value})}
-              />
+              {/* 🚨 STEP 1: SELECT LOCKDOWN TYPE */}
+              <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 italic">1. Select Scope</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Full Website Lockdown Toggle */}
+                  <label className={`flex items-center justify-between p-5 rounded-3xl border transition-all cursor-pointer ${maint?.fullLockdown ? 'bg-red-600/10 border-red-500/50 text-red-500' : 'bg-black/20 border-slate-800 text-slate-500 hover:border-slate-700'}`}>
+                    <div className="flex items-center gap-3">
+                      <IconShield className="w-4 h-4" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Full Site Lockdown</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      className="hidden"
+                      checked={maint?.fullLockdown || false}
+                      onChange={(e) => setMaint({...maint, fullLockdown: e.target.checked})}
+                    />
+                    <div className={`w-4 h-4 rounded-full border-2 ${maint?.fullLockdown ? 'bg-red-500 border-red-400 shadow-[0_0_10px_#ef4444]' : 'border-slate-700'}`} />
+                  </label>
 
-              <div className="space-y-3">
+                  {/* Page Specific Lockdown Selector */}
+                  <div className="p-5 bg-black/20 rounded-3xl border border-slate-800 space-y-3">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Restrict Specific Pages</p>
+                    <div className="flex gap-4">
+                      {['dashboard', 'billing'].map(page => (
+                        <label key={page} className="flex items-center gap-2 cursor-pointer group">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                            checked={maint?.restrictedPages?.includes(page)}
+                            onChange={(e) => {
+                              const pages = maint?.restrictedPages || [];
+                              const updated = e.target.checked ? [...pages, page] : pages.filter(p => p !== page);
+                              setMaint({...maint, restrictedPages: updated});
+                            }}
+                          />
+                          <span className={`text-[10px] font-black uppercase transition-colors ${maint?.restrictedPages?.includes(page) ? 'text-blue-500' : 'text-slate-700 group-hover:text-slate-500'}`}>{page}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🚨 STEP 2: LOCKDOWN MESSAGE */}
+              <div className="space-y-4 pt-2">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 italic">2. Display Message</p>
+                <textarea 
+                  className="w-full bg-slate-950 border border-slate-800 p-5 rounded-[2rem] outline-none focus:border-orange-500 font-bold text-xs text-white min-h-[120px] resize-none transition-all shadow-inner"
+                  placeholder="E.G. System under maintenance, but you may use the Basic Dashboard for purchasing..."
+                  value={maint?.message || ""}
+                  onChange={(e) => setMaint({...maint, message: e.target.value})}
+                />
+              </div>
+
+              {/* 🚨 STEP 3: EXECUTE PUSH */}
+              <div className="space-y-3 pt-4">
                 <button 
                   onClick={async () => {
                     try {
                       const mRef = doc(db, ...base, 'settings', 'maintenance');
-                      await setDoc(mRef, { ...maint, isActive: !maint?.isActive }, { merge: true });
-                      alert(`SYSTEM ${!maint?.isActive ? 'LOCKED' : 'UNLOCKED'} SUCCESSFULY!`);
+                      // I-save ang full configuration: isActive, message, fullLockdown, at restrictedPages
+                      await setDoc(mRef, { 
+                        ...maint, 
+                        isActive: !maint?.isActive 
+                      }, { merge: true });
+                      alert(`GOD MODE: SYSTEM ${!maint?.isActive ? 'LOCKED' : 'UNLOCKED'} GLOBALLY! 🚀`);
                     } catch (err) { alert("Error: " + err.message); }
                   }}
-                  className={`w-full py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all ${maint?.isActive ? 'bg-red-600 hover:bg-red-500 shadow-xl shadow-red-600/20' : 'bg-orange-600 hover:bg-orange-500 shadow-xl shadow-orange-600/20'}`}
+                  className={`w-full py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-2xl ${maint?.isActive ? 'bg-red-600 hover:bg-red-500 shadow-red-600/20' : 'bg-orange-600 hover:bg-orange-500 shadow-orange-600/20'}`}
                 >
-                  {maint?.isActive ? 'STOP MAINTENANCE' : 'ACTIVATE MAINTENANCE'}
+                  {maint?.isActive ? 'DEACTIVATE LOCKDOWN' : 'EXECUTE GLOBAL LOCKDOWN'}
                 </button>
+                
                 <button 
                   onClick={async () => {
                     const mRef = doc(db, ...base, 'settings', 'maintenance');
-                    await setDoc(mRef, { message: maint?.message || "" }, { merge: true });
-                    alert("Maintenance Message Updated!");
+                    await setDoc(mRef, maint, { merge: true });
+                    alert("Configuration Synchronized! 🔄");
                   }}
-                  className="w-full py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest text-slate-500 border border-slate-800 hover:bg-slate-800 transition-all"
+                  className="w-full py-4 rounded-[2rem] font-black uppercase text-[9px] tracking-widest text-slate-500 border border-slate-800 hover:bg-slate-800 hover:text-white transition-all"
                 >
-                  Update Message Only
+                  Sync Config Only (No Toggle)
                 </button>
               </div>
             </div>

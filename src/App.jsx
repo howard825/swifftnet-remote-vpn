@@ -23,6 +23,43 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 import PublicCheckBill from './pages/PublicCheckBill';
 
+
+// --- THE SMART BOUNCER ---
+const MaintenanceGuard = ({ children, pageName, maint, user }) => {
+  const isAdmin = user?.role === 'admin';
+  
+  // 🛡️ Admin Override: Kapag ikaw ang pumasok, laging lusot!
+  if (isAdmin) return children;
+
+  // 🚨 Check kung naka-Global Lockdown
+  if (maint?.isActive && maint?.fullLockdown) {
+    return <MaintenancePage message={maint.message} />;
+  }
+
+  // 🚨 Check kung ang page na ito ay kasama sa restrictedPages
+  if (maint?.isActive && maint?.restrictedPages?.includes(pageName)) {
+    return <MaintenancePage message={maint.message} />;
+  }
+
+  return children;
+};
+
+// --- THE LOCKDOWN UI ---
+const MaintenancePage = ({ message }) => (
+  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans">
+    <div className="w-20 h-20 bg-orange-600/10 rounded-3xl flex items-center justify-center mb-8 text-orange-500 animate-pulse border border-orange-500/20">
+       <span className="text-4xl">⚙️</span>
+    </div>
+    <h1 className="text-4xl font-black uppercase italic text-white mb-3 tracking-tighter">System <span className="text-orange-500">Lockdown</span></h1>
+    <p className="text-slate-500 max-w-md font-bold italic text-xs uppercase tracking-widest leading-relaxed">
+      {message || "We are currently optimizing this section of SwifftNet. Please check back later."}
+    </p>
+    <div className="mt-8 pt-8 border-t border-slate-900 w-full max-w-xs">
+       <p className="text-[8px] text-slate-700 font-black uppercase tracking-[0.5em]">SwifftNet Remote Engineering</p>
+    </div>
+  </div>
+);
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -136,15 +173,7 @@ export default function App() {
   };
 
   // MAINTENANCE GATE
-  if (maint.isActive && user?.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-4xl mb-6">⚙️</div>
-        <h1 className="text-4xl font-black uppercase italic text-white mb-2 tracking-tighter">System Optimization</h1>
-        <p className="text-slate-500 max-w-md font-medium italic text-sm">{maint.message || "We're optimizing SwifftNet. Be back soon!"}</p>
-      </div>
-    );
-  }
+
 
   return (
     <BrowserRouter>
@@ -152,18 +181,29 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/status" element={<ServerStatus />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/help" element={<HelpCenter />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-of-use" element={<TermsOfUse />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/check-bill" element={<PublicCheckBill />} />
         
-        <Route path="/login" element={!user ? <Login /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)} />
-        <Route path="/dashboard" element={user ? <ClientDashboard {...commonProps} /> : <Navigate to="/login" />} />
-        <Route path="/billing" element={user ? <BillingSystem {...commonProps} /> : <Navigate to="/login" />} />
+        {/* I-WRAP ANG DASHBOARD */}
+        <Route path="/dashboard" element={
+          <MaintenanceGuard pageName="dashboard" maint={maint} user={user}>
+            {user ? <ClientDashboard {...commonProps} /> : <Navigate to="/login" />}
+          </MaintenanceGuard>
+        } />
+
+        {/* I-WRAP ANG BILLING */}
+        <Route path="/billing" element={
+          <MaintenanceGuard pageName="billing" maint={maint} user={user}>
+            {user ? <BillingSystem {...commonProps} /> : <Navigate to="/login" />}
+          </MaintenanceGuard>
+        } />
+
         <Route path="/profile" element={user ? <Profile {...commonProps} /> : <Navigate to="/login" />} />
+        
+        {/* ADMIN PANEL: WALANG GUARD DAHIL ADMIN KA */}
         <Route path="/admin" element={user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/" />} />
+        
+        {/* MGA PUBLIC PAGES */}
+        <Route path="/check-bill" element={<PublicCheckBill />} />
+        <Route path="/login" element={!user ? <Login /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
