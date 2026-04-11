@@ -199,10 +199,10 @@ export default function ClientDashboard({
       setLoading(true);
 
       // 🚀 DITO ANG LOGIC SWITCH
-      const taskType = serviceCategory === 'internet' ? 'PROVISION_WIREGUARD' : 'PROVISION_VPN';
+      
 
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
-        type: taskType,
+        type: 'PROVISION_VPN',
         email: user.email,
         uid: user.uid,
         nodeId: assignments[0].id,
@@ -502,7 +502,7 @@ export default function ClientDashboard({
 
                 if (isInternet) {
                   // Dahil WireGuard na ang Internet, hindi na ito script sa MikroTik (conf file na ito)
-                  return `# WIREGUARD INTERNET READY\n# Please download the .conf file below and import to your WireGuard App.`;
+                  return `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes\n/ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping\n/ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade`;
                 } else {
                   // SSTP FOR REMOTE (Updated with Howard's Master Script)
                   return `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
@@ -595,27 +595,7 @@ export default function ClientDashboard({
                     </div>
                     {/* --- END: MIKROTIK DEPLOYMENT SCRIPT --- */}
 
-                    {asgn.wgConfig && (
-                      <div className="mt-6 p-6 bg-emerald-600/10 border border-emerald-500/30 rounded-[30px] flex flex-col items-center gap-4 animate-bounce">
-                        <div className="text-center">
-                          <p className="text-[10px] font-black text-emerald-500 uppercase">WireGuard Config Ready!</p>
-                          <p className="text-[8px] text-slate-500 font-bold">Import this to your phone or PC app.</p>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const element = document.createElement("a");
-                            const file = new Blob([asgn.wgConfig], {type: 'text/plain'});
-                            element.href = URL.createObjectURL(file);
-                            element.download = `SwifftNet-${asgn.nickname || 'Internet'}.conf`;
-                            document.body.appendChild(element);
-                            element.click();
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-2xl text-[9px] font-black uppercase shadow-lg transition-all"
-                        >
-                          Download WireGuard .conf
-                        </button>
-                      </div>
-                    )}
+                    
 
                     {/* Setup Command Script */}
                     {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
