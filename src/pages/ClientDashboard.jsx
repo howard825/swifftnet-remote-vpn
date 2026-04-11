@@ -192,44 +192,39 @@ export default function ClientDashboard({
   };
 
   const handleBuyVPN = async () => {
-    // 1. Pre-flight Checks
     if (!canAfford) return alert("Insufficient balance to buy this VPN.");
-    
-    // Kailangan natin ng target node (assignment) para alam ng Bridge kung saan mag-co-connect
-    if (!assignments || assignments.length === 0) {
-      return alert("You need an active Node Assignment first before buying a VPN.");
-    }
+    if (!assignments || assignments.length === 0) return alert("No active Node Assignment detected.");
 
     try {
       setLoading(true);
 
-      // 2. ⚡ THE BRIDGE TRIGGER: Create Provisioning Task
-      // Ito ang babasahin ng Bridge machine mo sa 'tasks' collection
+      // 🚀 DITO ANG LOGIC SWITCH
+      const taskType = serviceCategory === 'internet' ? 'PROVISION_WIREGUARD' : 'PROVISION_VPN';
+
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
-        type: 'PROVISION_VPN',
+        type: taskType,
         email: user.email,
         uid: user.uid,
-        nodeId: assignments[0].id, // Target node
-        category: serviceCategory, // 'remote' or 'internet'
-        service: requestService,   // 'winbox', 'api', etc.
+        nodeId: assignments[0].id,
+        category: serviceCategory,
+        service: requestService,
         pricePaid: currentPrice,
         status: 'pending',
         createdAt: serverTimestamp()
       });
 
-      // 3. RECORD TRANSACTION (Para mabawasan ang balance sa UI)
       await addDoc(collection(db, ...base, 'requests'), {
         email: user.email,
-        status: 'assigned', // Auto-approved
+        status: 'assigned',
         type: 'new_vpn_auto',
         category: serviceCategory,
         service: requestService,
         pricePaid: currentPrice,
-        note: `Auto-Provisioned VPN: ${serviceCategory.toUpperCase()}`,
+        note: `Auto-Provisioned: ${serviceCategory.toUpperCase()} (${taskType})`,
         date: serverTimestamp()
       });
 
-      alert("🚀 MISSION SUCCESS! System is now provisioning your VPN and NAT Rules. Please wait, credentials will be ready in 30 seconds!");
+      alert(`🚀 MISSION SUCCESS! System is now provisioning your ${serviceCategory.toUpperCase()} access. Please wait 30 seconds!`);
     } catch (err) {
       alert("System Error: " + err.message);
     } finally {
@@ -501,27 +496,16 @@ export default function ClientDashboard({
               const isExpired = new Date() > new Date(asgn.expiry);
 
               const script = (() => {
-                // 1. DITO ANG FIX: Ginawa nating lowercase at trimmed para sigurado ang match
-                // Kung HINDI exactly 'internet', automatic na SSTP ang gagamitin (Remote Access)
                 const categoryName = (asgn.category || '').toLowerCase().trim();
                 const isInternet = categoryName === 'internet';
-                
-                const protocol = isInternet ? 'l2tp' : 'sstp';
                 const interfaceName = `SwifftNet-${isInternet ? 'Internet' : 'Remote'}`;
 
-
-
-                // 2. Base Script Selection
-                let baseScript = protocol === 'l2tp' 
-                  ? `/interface l2tp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} use-ipsec=yes`
-                  : `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption`;
-
                 if (isInternet) {
-                  // Internet VPN Script
-                  return `${baseScript}\n/ip route add dst-address=0.0.0.0/0 gateway=${interfaceName} distance=1 check-gateway=ping\n/ip firewall nat add chain=srcnat out-interface=${interfaceName} action=masquerade`;
+                  // Dahil WireGuard na ang Internet, hindi na ito script sa MikroTik (conf file na ito)
+                  return `# WIREGUARD INTERNET READY\n# Please download the .conf file below and import to your WireGuard App.`;
                 } else {
-                  // Original Remote Script + Silent Monitor Port logic (HINDI BINURA)
-                  return `${baseScript}\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
+                  // SSTP FOR REMOTE (Updated with Howard's Master Script)
+                  return `/interface sstp-client add connect-to=remote.swifftnet.site name=${interfaceName} user=${asgn.user} password=${asgn.pass} profile=default-encryption\n/ip firewall filter add action=accept chain=input comment="SwifftNET-Remote" place-before=0 src-address=192.168.88.0/21\n/ip firewall filter add action=accept chain=forward comment="SwifftNET-Remote" place-before=1 src-address=192.168.88.0/21\n/ip service set winbox address=192.168.88.0/21 api address=192.168.88.0/21 ssh address=192.168.88.0/21 www address=192.168.88.0/21`;
                 }
               })();
 
@@ -611,6 +595,28 @@ export default function ClientDashboard({
                     </div>
                     {/* --- END: MIKROTIK DEPLOYMENT SCRIPT --- */}
 
+                    {asgn.wgConfig && (
+                      <div className="mt-6 p-6 bg-emerald-600/10 border border-emerald-500/30 rounded-[30px] flex flex-col items-center gap-4 animate-bounce">
+                        <div className="text-center">
+                          <p className="text-[10px] font-black text-emerald-500 uppercase">WireGuard Config Ready!</p>
+                          <p className="text-[8px] text-slate-500 font-bold">Import this to your phone or PC app.</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const element = document.createElement("a");
+                            const file = new Blob([asgn.wgConfig], {type: 'text/plain'});
+                            element.href = URL.createObjectURL(file);
+                            element.download = `SwifftNet-${asgn.nickname || 'Internet'}.conf`;
+                            document.body.appendChild(element);
+                            element.click();
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-2xl text-[9px] font-black uppercase shadow-lg transition-all"
+                        >
+                          Download WireGuard .conf
+                        </button>
+                      </div>
+                    )}
+
                     {/* Setup Command Script */}
                     {/* --- START: MANAGEMENT PORTS (Corrected Fields) --- */}
                     <div className="bg-slate-950/30 p-6 rounded-[32px] border border-slate-800/50 space-y-4">
@@ -673,6 +679,7 @@ export default function ClientDashboard({
                           style={{ width: `${Math.max(0, Math.min(100, ((new Date(asgn.expiry).getTime() - new Date().getTime()) / (365 * 24 * 60 * 60 * 1000)) * 100))}%` }}
                         />
                       </div>
+
                       
                       {/* STATUS BUTTONS */}
                       {asgn.status !== 'active' ? (
