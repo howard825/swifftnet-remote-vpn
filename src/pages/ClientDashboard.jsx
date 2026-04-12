@@ -192,44 +192,46 @@ export default function ClientDashboard({
   };
 
   const handleBuyVPN = async () => {
-    // 1. Pre-flight Checks
+    // 1. Balance Check (Dapat laging una ito)
     if (!canAfford) return alert("Insufficient balance to buy this VPN.");
     
-    // Kailangan natin ng target node (assignment) para alam ng Bridge kung saan mag-co-connect
-    if (!assignments || assignments.length === 0) {
-      return alert("You need an active Node Assignment first before buying a VPN.");
-    }
+    // 2. LOGIC FIX: Inalis natin ang "if (!assignments)" block 
+    // para payagan ang mga bagong clients na wala pang existing nodes.
 
     try {
       setLoading(true);
 
-      // 2. ⚡ THE BRIDGE TRIGGER: Create Provisioning Task
-      // Ito ang babasahin ng Bridge machine mo sa 'tasks' collection
+      const taskType = 'PROVISION_VPN';
+      
+      // Kunin ang ID kung meron na, kundi ay null (Bridge will handle new provision)
+      const targetNodeId = assignments && assignments.length > 0 ? assignments[0].id : "new_assignment";
+
+      // 3. ⚡ THE BRIDGE TRIGGER
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
-        type: 'PROVISION_VPN',
+        type: taskType,
         email: user.email,
         uid: user.uid,
-        nodeId: assignments[0].id, // Target node
+        nodeId: targetNodeId, 
         category: serviceCategory, // 'remote' or 'internet'
-        service: requestService,   // 'winbox', 'api', etc.
+        service: requestService,
         pricePaid: currentPrice,
         status: 'pending',
         createdAt: serverTimestamp()
       });
 
-      // 3. RECORD TRANSACTION (Para mabawasan ang balance sa UI)
+      // 4. RECORD TRANSACTION
       await addDoc(collection(db, ...base, 'requests'), {
         email: user.email,
-        status: 'assigned', // Auto-approved
+        status: 'assigned',
         type: 'new_vpn_auto',
         category: serviceCategory,
         service: requestService,
         pricePaid: currentPrice,
-        note: `Auto-Provisioned VPN: ${serviceCategory.toUpperCase()}`,
+        note: `Auto-Provisioned: ${serviceCategory.toUpperCase()} (${taskType})`,
         date: serverTimestamp()
       });
 
-      alert("🚀 MISSION SUCCESS! System is now provisioning your VPN and NAT Rules. Please wait, credentials will be ready in 30 seconds!");
+      alert(`🚀 MISSION SUCCESS! SwifftNET is now provisioning your ${serviceCategory.toUpperCase()} environment. Please wait 30 seconds!`);
     } catch (err) {
       alert("System Error: " + err.message);
     } finally {
