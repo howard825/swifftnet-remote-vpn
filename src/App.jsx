@@ -208,6 +208,7 @@ export default function App() {
         <Route path="/admin" element={user?.role === 'admin' ? <AdminPanel {...commonProps} /> : <Navigate to="/" />} />
         
         <Route path="/check-bill" element={<PublicCheckBill />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login" element={!user ? <Login /> : (user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />)} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
